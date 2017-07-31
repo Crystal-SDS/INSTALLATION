@@ -16,8 +16,9 @@ Crystal source code is structured in several components:
 
 * **[Filter middleware](https://github.com/Crystal-SDS/filter-middleware)**: the middleware (data plane) that executes storage filters that intercept object flows to run computations or perform transformations on them.
 
-* **[Dashboard]((https://github.com/Crystal-SDS/dashboard)**: A user-friendly dashboard to manage policies, filters and workload metrics.
+* **[Dashboard](https://github.com/Crystal-SDS/dashboard)**: A user-friendly dashboard to manage policies, filters and workload metrics.
 
 
 # INSTALLATION
-Crystal installation instructions
+
+For installing an All-In-One machine with Crystal download the `install_aio.sh` script, and run it as sudo user.

@@ -158,7 +158,6 @@ swift-init main restart
 
 ###### Horizon ######
 apt install openstack-dashboard -y
-# EDIT /etc/openstack-dashboard/local_settings.py
 
 cat << EOF >> /etc/openstack-dashboard/local_settings.py
 OPENSTACK_API_VERSIONS = {
