@@ -1,0 +1,2 @@
+# INSTALLATION
+Crystal installation instructions
