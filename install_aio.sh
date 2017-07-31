@@ -5,7 +5,7 @@ add-apt-repository cloud-archive:ocata -y
 apt update && apt dist-upgrade -y
 apt install python-openstackclient -y
 
-###### Install Memcahce ######
+###### Install Memcache ######
 apt install memcached python-memcache -y
 sed -i '/-l 127.0.0.1/c\-l controller' /etc/memcached.conf
 service memcached restart

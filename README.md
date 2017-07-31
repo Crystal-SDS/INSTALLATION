@@ -21,4 +21,30 @@ Crystal source code is structured in several components:
 
 # INSTALLATION
 
-For installing an All-In-One machine with Crystal download the `install_aio.sh` script, and run it as sudo user.
+### Cluster deployment
+
+Follow the instructions contained in each of the previous repositories.
+
+### All-In-One Machine
+
+For testing purposes, is possible to install an All-In-One (AiO) machine with all the Crystal components and requirements.
+We prepared a script for automating this task, the only requirement is a clean installation of Ubuntu Server 16.04. Then, download the `install_aio.sh` script and run it as sudo user.
+
+### Development VM
+
+The easiest way to start using Crystal is to download the Development Virtual Machine.
+
+The Development VM runs a Swift-all-in-one cluster together with Storlets and Crystal controller and middlewares.
+It also includes an extended version of the OpenStack Dashboard that simplifies the management of Crystal filters, metrics and policies.
+
+Download the Development VM from the following URL:
+
+* ftp://ast2-deim.urv.cat/s2caio_vm
+
+## Support
+
+Please [open an issue](https://github.com/Crystal-SDS/INSTALLATION/issues/new) for support.
+
+## Contributing
+
+Please contribute using [Github Flow](https://guides.github.com/introduction/flow/). Create a branch, add commits, and [open a pull request](https://github.com/Crystal-SDS/INSTALLATION/compare/).
