@@ -28,7 +28,7 @@ Follow the instructions contained in each of the previous repositories.
 ### All-In-One Machine
 
 For testing purposes, is possible to install an All-In-One (AiO) machine with all the Crystal components and requirements.
-We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Then, download the `install_aio.sh` script and run it as sudo user. Run the following command to rapidly execute the script:
+We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Then, download the `install_aio.sh` script and run it as sudo user. Run the following command for rapidly executing the script:
 
 * `curl -fsSL https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh | /bin/bash`
 

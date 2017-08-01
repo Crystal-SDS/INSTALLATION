@@ -15,7 +15,9 @@ echo -e "$IP_ADRESS \t controller" >> /etc/hosts
 ###### Install Common ######
 apt install software-properties-common -y
 add-apt-repository cloud-archive:ocata -y
-apt update && apt dist-upgrade -y
+apt update
+# apt dist-upgrade -y
+DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
 apt install python-openstackclient -y
 
 ###### Install Memcahce ######
