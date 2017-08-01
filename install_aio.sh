@@ -1,31 +1,46 @@
 #!/bin/bash
+
+#########  PASSWORDS  #########
+MYSQL_PASSWD=root
+RABBITMQ_PASSWD=openstack
+KEYSTONE_ADMIN_PASSWD=keystone
+MANAGER_PASSWD=manager
+###############################
+
+echo controller > /etc/hostname
+echo -e "127.0.0.1 \t localhost" > /etc/hosts
+IP_ADRESS=`hostname -I`
+echo -e "$IP_ADRESS \t controller" >> /etc/hosts
+
 ###### Install Common ######
 apt install software-properties-common -y
 add-apt-repository cloud-archive:ocata -y
 apt update && apt dist-upgrade -y
 apt install python-openstackclient -y
 
-###### Install Memcache ######
+###### Install Memcahce ######
 apt install memcached python-memcache -y
 sed -i '/-l 127.0.0.1/c\-l controller' /etc/memcached.conf
 service memcached restart
 
 ###### Install RabbitMQ ######
 apt install rabbitmq-server -y
-rabbitmqctl add_user openstack openstack
+rabbitmqctl add_user openstack $RABBITMQ_PASSWD
+rabbitmqctl set_user_tags openstack administrator
 rabbitmqctl set_permissions openstack ".*" ".*" ".*"
+rabbitmq-plugins enable rabbitmq_management
 
 ###### Install MySQL ######
 export DEBIAN_FRONTEND=noninteractive
-sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password password root'
-sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password_again password root'
+sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password password $MYSQL_PASSWD'
+sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password_again password $MYSQL_PASSWD'
 apt install mariadb-server python-pymysql -y
 unset DEBIAN_FRONTEND
 
-mysql -uroot -proot -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
-mysql -uroot -proot -e "DELETE FROM mysql.user WHERE User=''"
-mysql -uroot -proot -e "DROP DATABASE test"
-mysql -uroot -proot -e "FLUSH PRIVILEGES"
+mysql -uroot -p$MYSQL_PASSWD -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+mysql -uroot -p$MYSQL_PASSWD -e "DELETE FROM mysql.user WHERE User=''"
+mysql -uroot -p$MYSQL_PASSWD -e "DROP DATABASE test"
+mysql -uroot -p$MYSQL_PASSWD -e "FLUSH PRIVILEGES"
 
 cat << EOF >> /etc/mysql/mariadb.conf.d/99-openstack.cnf
 [mysqld]
@@ -40,9 +55,9 @@ EOF
 service mysql restart
 
 ###### Install Keystone ######
-mysql -uroot -proot -e "CREATE DATABASE keystone"
-mysql -uroot -proot -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone'"
-mysql -uroot -proot -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone'"
+mysql -uroot -p$MYSQL_PASSWD -e "CREATE DATABASE keystone"
+mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone'"
+mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone'"
 
 apt install keystone -y
 
@@ -52,7 +67,7 @@ sed -i '/#provider = fernet/c\provider = fernet' /etc/keystone/keystone.conf
 su -s /bin/sh -c "keystone-manage db_sync" keystone
 keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
 keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
-keystone-manage bootstrap --bootstrap-password keystone --bootstrap-admin-url http://controller:35357/v3/ --bootstrap-internal-url http://controller:5000/v3/ --bootstrap-public-url http://controller:5000/v3/ --bootstrap-region-id RegionOne
+keystone-manage bootstrap --bootstrap-password $KEYSTONE_ADMIN_PASSWD --bootstrap-admin-url http://controller:35357/v3/ --bootstrap-internal-url http://controller:5000/v3/ --bootstrap-public-url http://controller:5000/v3/ --bootstrap-region-id RegionOne
 
 echo "ServerName controller" >> /etc/apache2/apache2.conf
 service apache2 restart
@@ -60,7 +75,7 @@ rm -f /var/lib/keystone/keystone.db
 
 cat << EOF >> admin-openrc
 export OS_USERNAME=admin
-export OS_PASSWORD=keystone
+export OS_PASSWORD=$KEYSTONE_ADMIN_PASSWD
 export OS_PROJECT_NAME=admin
 export OS_USER_DOMAIN_NAME=Default
 export OS_PROJECT_DOMAIN_NAME=Default
@@ -72,12 +87,12 @@ source admin-openrc
 openstack role create user
 openstack project create --domain default --description "Service Project" service
 openstack project create --domain default --description "Management Project" management
-openstack user create --domain default --password manager manager
+openstack user create --domain default --password $MANAGER_PASSWD manager
 openstack role add --project management --user manager admin
 
 cat << EOF >> manager-openrc
 export OS_USERNAME=manager
-export OS_PASSWORD=manager
+export OS_PASSWORD=$MANAGER_PASSWD
 export OS_PROJECT_NAME=management
 export OS_USER_DOMAIN_NAME=Default
 export OS_PROJECT_DOMAIN_NAME=Default
@@ -158,7 +173,6 @@ swift-init main restart
 
 ###### Horizon ######
 apt install openstack-dashboard -y
-
 cat << EOF >> /etc/openstack-dashboard/local_settings.py
 OPENSTACK_API_VERSIONS = {
     "identity": 3,
@@ -170,9 +184,121 @@ sed -i '/OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v2.0" % OPENSTACK_HOST/c\OP
 sed -i '/OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"/c\OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"' /etc/openstack-dashboard/local_settings.py
 
 chown www-data:www-data -R /var/lib/openstack-dashboard/secret_key
-chown www-data:www-data -R /usr/share/openstack-dashboard
+#chown www-data:www-data -R /usr/share/openstack-dashboard
 service apache2 restart
 
 ###### Install Python Env ######
 apt install python-pip python-dev -y
 pip install -U pip
+
+#### Crystal Controller #####
+apt install redis-server -y
+sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
+service redis restart
+
+git clone https://github.com/Crystal-SDS/controller -b dev /usr/share/crystal-controller
+pip install pyactor redis pika pytz eventlet djangorestframework django-bootstrap3
+cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
+a2ensite crystal_controller
+service apache2 restart
+
+#### Crystal Dashboard #####
+git clone https://github.com/Crystal-SDS/dashboard /usr/share/crystal-dashboard
+cp /usr/share/crystal-dashboard/crystal_dashboard/enabled/_50_sdscontroller.py /usr/share/openstack-dashboard/openstack_dashboard/enabled/
+cat /usr/share/crystal-dashboard/crystal_dashboard/local/local_settings.py >>  /etc/openstack-dashboard/local_settings.py
+pip install /usr/share/crystal-dashboard
+service apache2 restart
+
+#### Filter middleware #####
+git clone https://github.com/Crystal-SDS/filter-middleware
+pip install filter-middleware/
+
+cat << EOF >> /etc/swift/proxy-server.conf
+
+[filter:crystal_filter_handler]
+use = egg:swift_crystal_filter_middleware#crystal_filter_handler
+os_identifier = proxy_controller
+storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
+execution_server = proxy
+EOF
+
+cat << EOF >> /etc/swift/object-server.conf
+
+[filter:crystal_filter_handler]
+use = egg:swift_crystal_filter_middleware#crystal_filter_handler
+os_identifier = object_controller
+storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
+execution_server = object
+EOF
+
+#### Metric middleware #####
+
+git clone https://github.com/Crystal-SDS/metric-middleware
+pip install metric-middleware/
+
+cat << EOF >> /etc/swift/proxy-server.conf
+
+[filter:crystal_metric_handler]
+use = egg:swift_crystal_metric_middleware#crystal_metric_handler
+execution_server = proxy
+rabbit_username = openstack
+rabbit_password = $RABBITMQ_PASSWD
+EOF
+
+cat << EOF >> /etc/swift/object-server.conf
+
+[filter:crystal_metric_handler]
+use = egg:swift_crystal_metric_middleware#crystal_metric_handler
+execution_server = object
+rabbit_username = openstack
+rabbit_password = $RABBITMQ_PASSWD
+EOF
+
+sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
+sed  -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
+
+sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
+sed  -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
+
+swift-init main restart
+
+####   ELK Stack  ####
+add-apt-repository -y ppa:webupd8team/java
+apt update
+echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
+echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections
+apt -y install oracle-java8-installer
+
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list
+apt update
+apt install -y elasticsearch logstash kibana
+
+sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
+
+cat << EOF >> /etc/logstash/conf.d/logstash.conf
+input {
+  udp{
+    port => 5400
+    codec => json
+  }
+}
+output {
+   elasticsearch {
+       hosts => ["localhost:9200"]
+   }
+}
+EOF
+
+systemctl enable elasticsearch
+systemctl enable logstash
+systemctl enable kibana
+
+service elasticsearch restart
+service logstash restart
+service kibana restart
+
+##### Import dashboards to kibana #####
+
+reboot
+

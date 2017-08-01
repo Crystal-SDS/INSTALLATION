@@ -28,7 +28,11 @@ Follow the instructions contained in each of the previous repositories.
 ### All-In-One Machine
 
 For testing purposes, is possible to install an All-In-One (AiO) machine with all the Crystal components and requirements.
-We prepared a script for automating this task, the only requirement is a clean installation of Ubuntu Server 16.04. Then, download the `install_aio.sh` script and run it as sudo user.
+We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Then, download the `install_aio.sh` script and run it as sudo user.
+
+The script first installs Kesytone, Swift and Horizon, then it proceed to install all the Crystal packages. Note that the script uses weak password for the installed services, so if you want more securely services, please change them at the top of the script.
+
+The script takes around 10 minutes to complete (it depends of the network connection). Once completed, you can access to the Dashboard by typing the following url in the web browser: `http://<node-ip>/horizon`
 
 ### Development VM
 
