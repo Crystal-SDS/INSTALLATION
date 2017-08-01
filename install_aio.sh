@@ -301,4 +301,3 @@ service kibana restart
 ##### Import dashboards to kibana #####
 
 reboot
-
