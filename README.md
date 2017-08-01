@@ -30,7 +30,7 @@ Follow the instructions contained in each of the previous repositories.
 For testing purposes, is possible to install an All-In-One (AiO) machine with all the Crystal components and requirements.
 We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Then, download the `install_aio.sh` script and run it as sudo user. Run the following command for rapidly execute the script:
 
-`* curl -fsSL https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh | sh`
+* `curl -fsSL https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh | sh`
 
 The script first installs Kesytone, Swift and Horizon, then it proceed to install all the Crystal packages. Note that the script uses weak password for the installed services, so if you want more securely services, please change them at the top of the script.
 
