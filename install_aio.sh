@@ -124,7 +124,7 @@ openstack service create --name swift --description "OpenStack Object Storage" o
 
 openstack endpoint create --region RegionOne object-store public http://controller:8080/v1/AUTH_%\(tenant_id\)s >> /tmp/crystal_aio.log 2>&1
 openstack endpoint create --region RegionOne object-store internal http://controller:8080/v1/AUTH_%\(tenant_id\)s >> /tmp/crystal_aio.log 2>&1
-openstack endpoint create --region RegionOne object-store admin http://controller:8080/v1 > /dev/null 2>%1
+openstack endpoint create --region RegionOne object-store admin http://controller:8080/v1 >> /tmp/crystal_aio.log 2>&1
 
 apt-get install swift swift-proxy python-swiftclient python-keystoneclient python-keystonemiddleware memcached -y >> /tmp/crystal_aio.log 2>&1
 apt-get install xfsprogs rsync -y >> /tmp/crystal_aio.log 2>&1
@@ -297,7 +297,7 @@ apt-get -y install oracle-java8-installer >> /tmp/crystal_aio.log 2>&1
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add - >> /tmp/crystal_aio.log 2>&1
 echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log 2>&1
-apt-get install -y elasticsearch logstash kibana >> /tmp/crystal_aio.log 2>&1
+apt-get install -y elasticsearch logstash kibana metricbeat >> /tmp/crystal_aio.log 2>&1
 
 sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
 
@@ -318,14 +318,17 @@ EOF
 systemctl enable elasticsearch  >> /tmp/crystal_aio.log 2>&1
 systemctl enable logstash >> /tmp/crystal_aio.log 2>&1
 systemctl enable kibana >> /tmp/crystal_aio.log 2>&1
+systemctl enable metricbeat >> /tmp/crystal_aio.log 2>&1
 
 service elasticsearch restart >> /tmp/crystal_aio.log 2>&1
 service logstash restart >> /tmp/crystal_aio.log 2>&1
 service kibana restart >> /tmp/crystal_aio.log 2>&1
+service metricbeat restart >> /tmp/crystal_aio.log 2>&1
 
 printf "\tDone!\n"
 
 ##### Import dashboards to kibana #####
+/usr/share/metricbeat/scripts/import_dashboards
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
 printf "Access to the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"
