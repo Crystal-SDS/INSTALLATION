@@ -28,13 +28,24 @@ Follow the instructions contained in each of the previous repositories.
 ### All-In-One Machine
 
 For testing purposes, is possible to install an All-In-One (AiO) machine with all the Crystal components and requirements.
-We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Then, download the `install_aio.sh` script and run it as sudo user. Run the following command for rapidly executing the script:
+We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Is preferable to upgrade your system to the latest version with `apt update && apt dist-upgrade` before starting the installation. Then, download the `install_aio.sh` script and run it as sudo user:
 
-* `curl -fsSL https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh | /bin/bash`
+```bash
+sudo su
+wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh
+chmod 777 install_aio.sh
+./install_aio.sh
+```
 
-The script first installs Kesytone, Swift and Horizon, then it proceed to install all the Crystal packages. Note that the script uses weak password for the installed services, so if you want more securely services, please change them at the top of the script.
+The script first installs Kesytone, Swift and Horizon (Ocata version), then it proceed to install all the Crystal packages. Note that the script uses weak password for the installed services, so if you want more securely services, please change them at the top of the script.
 
-The script takes around 10 minutes to complete (it depends of the network connection). Once completed, you can access to the Dashboard by typing the following url in the web browser: `http://<node-ip>/horizon`
+By default, the script has low verbosity. To see the full installation log, run the following command in another terminal:
+
+```bash
+tail -f /tmp/crystal_aio.log
+```
+
+The script takes long to complete (it depends of the network connection). Once completed, you can access to the Dashboard by typing the following url in the web browser: `http://<node-ip>/horizon`
 
 ### Development VM
 
