@@ -290,9 +290,10 @@ printf "\tDone!\n"
 printf "Installing ELK stack\t\t ... \t80%%"
 add-apt-repository -y ppa:webupd8team/java >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log 2>&1
-echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
-echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections
-apt-get -y install oracle-java8-installer >> /tmp/crystal_aio.log 2>&1
+#echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
+#echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections
+#apt-get -y install oracle-java8-installer >> /tmp/crystal_aio.log 2>&1
+apt-get -y install openjdk-8-jdk openjdk-8-jre >> /tmp/crystal_aio.log 2>&1
 
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add - >> /tmp/crystal_aio.log 2>&1
 echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list >> /tmp/crystal_aio.log 2>&1
@@ -327,8 +328,47 @@ service metricbeat restart >> /tmp/crystal_aio.log 2>&1
 
 printf "\tDone!\n"
 
-##### Import dashboards to kibana #####
-/usr/share/metricbeat/scripts/import_dashboards
+##### Install Storlets #####
+
+# Install Docker
+apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
+apt-get update
+apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine
+usermod -aG docker $(whoami)
+
+cat << EOF >> /etc/docker/daemon.json
+{
+"data-root": "/home/docker_device/docker"
+}
+EOF
+
+service docker stop
+service docker start
+
+# Install Storlets
+printf "Installing Storlets\t\t ... \t90%%"
+git clone https://github.com/openstack/storlets >> /tmp/crystal_aio.log 2>&1
+pip install storlets/ >> /tmp/crystal_aio.log 2>&1
+cd storlets
+apt-get -y install ant >> /tmp/crystal_aio.log 2>&1
+./install_libs.sh >> /tmp/crystal_aio.log 2>&1
+mkdir /home/docker_device/scripts
+chown swift:swift /home/docker_device/scripts
+cp scripts/restart_docker_container /home/docker_device/scripts/
+cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/
+chown root:root /home/docker_device/scripts/*
+chmod 04755 /home/docker_device/scripts/*
+
+cd ..
+printf "\tDone!\n"
+
+# Import dashboards to kibana
+printf "Initializating Crystal\t\t ... \t90%%"
+/usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
+echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
+curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
+printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
 printf "Access to the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"

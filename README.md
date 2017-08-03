@@ -31,10 +31,9 @@ For testing purposes, is possible to install an All-In-One (AiO) machine with al
 We prepared a script for automating this task. The requirements of the machine are a clean installation of **Ubuntu Server 16.04**, and at least 6GB of RAM due to the quantity of services the AiO Crystal installation contains. Is preferable to upgrade your system to the latest version with `apt update && apt dist-upgrade` before starting the installation. Then, download the `install_aio.sh` script and run it as sudo user:
 
 ```bash
-sudo su
 wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/install_aio.sh
 chmod 777 install_aio.sh
-./install_aio.sh
+sudo ./install_aio.sh
 ```
 
 The script first installs Kesytone, Swift and Horizon (Ocata version), then it proceed to install all the Crystal packages. Note that the script uses weak password for the installed services, so if you want more securely services, please change them at the top of the script.
