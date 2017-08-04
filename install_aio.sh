@@ -113,7 +113,6 @@ export OS_PROJECT_DOMAIN_NAME=Default
 export OS_AUTH_URL=http://controller:5000/v3
 export OS_IDENTITY_API_VERSION=3
 EOF
-printf "\tDone!\n"
 
 # create Crystal tenant and user
 openstack project create --domain default --description "Crystal Test Project" crystal >> /tmp/crystal_aio.log 2>&1
@@ -201,8 +200,8 @@ sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/object-server.co
 systemctl stop swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 systemctl disable swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 swift-init all stop >> /tmp/crystal_aio.log 2>&1
-usermod -u 1010 swift
-groupmod -g 1010 swift
+#usermod -u 1010 swift
+#groupmod -g 1010 swift
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
@@ -374,7 +373,6 @@ cp scripts/restart_docker_container /home/docker_device/scripts/ >> /tmp/crystal
 cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/ >> /tmp/crystal_aio.log 2>&1
 chown root:root /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
 chmod 04755 /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
-cd ..
 
 # Create Storlet docker runtime
 usermod -aG docker $(whoami) >> /tmp/crystal_aio.log 2>&1
@@ -382,15 +380,29 @@ sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.
 install/storlets/prepare_storlets_install.sh dev host >> /tmp/crystal_aio.log 2>&1
 
 cd install/storlets/
+SWIFT_UID=id -u swift
+SWIFT_GID=id -g swift
 sed -i '/- role: docker_client/c\  #- role: docker_client' docker_cluster.yml >> /tmp/crystal_aio.log 2>&1
-sed -i '/"swift_user_id": "1003"/c\"swift_user_id": "1010",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
-sed -i '/"swift_group_id": "1003"/c\"swift_group_id": "1010",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_user_id": "1003"/c\"swift_user_id": "$SWIFT_UID",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_group_id": "1003"/c\"swift_group_id": "$SWIFT_GID",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
 ansible-playbook -s -i storlets_dynamic_inventory.py docker_cluster.yml --connection=local >> /tmp/crystal_aio.log 2>&1
-docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f
+docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
+cd ~
 
 ##### Initialize Crystal #####
 printf "Initializating Crystal\t\t ... \t95%%"
+
+# Initializa Crystal test tenant
+. crystal-openrc
+PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
+docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
+swift post storlet
+swift post dependency
+swift post -H "X-account-meta-storlet-enabled:True"
+swift post -H "X-account-meta-crystal-enabled:True"
+
+# Put default dashboards to kibana
 /usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
 echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
 curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
