@@ -185,6 +185,8 @@ sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/object-server.co
 systemctl stop swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 systemctl disable swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 swift-init all stop >> /tmp/crystal_aio.log 2>&1
+usermod -u 1010 swift
+groupmod -g 1010 swift
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
@@ -329,13 +331,13 @@ service metricbeat restart >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
 ##### Install Storlets #####
-
+printf "Installing Storlets\t\t ... \t90%%"
 # Install Docker
-apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
-apt-get update
-apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine
-usermod -aG docker $(whoami)
+apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D >> /tmp/crystal_aio.log 2>&1
+apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' >> /tmp/crystal_aio.log 2>&1
+apt-get update >> /tmp/crystal_aio.log 2>&1
+apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine >> /tmp/crystal_aio.log 2>&1
+usermod -aG docker $(whoami) >> /tmp/crystal_aio.log 2>&1
 
 cat << EOF >> /etc/docker/daemon.json
 {
@@ -343,31 +345,31 @@ cat << EOF >> /etc/docker/daemon.json
 }
 EOF
 
-service docker stop
-service docker start
+service docker stop >> /tmp/crystal_aio.log 2>&1
+service docker start >> /tmp/crystal_aio.log 2>&1
 
 # Install Storlets
-printf "Installing Storlets\t\t ... \t90%%"
 git clone https://github.com/openstack/storlets >> /tmp/crystal_aio.log 2>&1
 pip install storlets/ >> /tmp/crystal_aio.log 2>&1
 cd storlets
 apt-get -y install ant >> /tmp/crystal_aio.log 2>&1
 ./install_libs.sh >> /tmp/crystal_aio.log 2>&1
-mkdir /home/docker_device/scripts
-chown swift:swift /home/docker_device/scripts
-cp scripts/restart_docker_container /home/docker_device/scripts/
-cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/
-chown root:root /home/docker_device/scripts/*
-chmod 04755 /home/docker_device/scripts/*
-
+mkdir /home/docker_device/scripts >> /tmp/crystal_aio.log 2>&1
+chown swift:swift /home/docker_device/scripts >> /tmp/crystal_aio.log 2>&1
+cp scripts/restart_docker_container /home/docker_device/scripts/ >> /tmp/crystal_aio.log 2>&1
+cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/ >> /tmp/crystal_aio.log 2>&1
+chown root:root /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
+chmod 04755 /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
 cd ..
 printf "\tDone!\n"
 
-# Import dashboards to kibana
-printf "Initializating Crystal\t\t ... \t90%%"
+##### Initialize Crystal #####
+printf "Initializating Crystal\t\t ... \t95%%"
 /usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
 echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
 curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
+KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
+curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}'
 printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
