@@ -115,6 +115,22 @@ export OS_IDENTITY_API_VERSION=3
 EOF
 printf "\tDone!\n"
 
+# create Crystal tenant and user
+openstack project create --domain default --description "Crystal Test Project" crystal >> /tmp/crystal_aio.log 2>&1
+openstack user create --domain default --password crystal crystal >> /tmp/crystal_aio.log 2>&1
+openstack role add --project crystal --user crystal admin >> /tmp/crystal_aio.log 2>&1
+
+cat << EOF >> crystal-openrc
+export OS_USERNAME=crystal
+export OS_PASSWORD=crystal
+export OS_PROJECT_NAME=crystal
+export OS_USER_DOMAIN_NAME=Default
+export OS_PROJECT_DOMAIN_NAME=Default
+export OS_AUTH_URL=http://controller:5000/v3
+export OS_IDENTITY_API_VERSION=3
+EOF
+printf "\tDone!\n"
+
 ###### Install Swift ######
 printf "Installing OpenStack Swift\t ... \t20%%"
 source admin-openrc
@@ -336,8 +352,7 @@ printf "Installing Storlets\t\t ... \t90%%"
 apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D >> /tmp/crystal_aio.log 2>&1
 apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log 2>&1
-apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine >> /tmp/crystal_aio.log 2>&1
-usermod -aG docker $(whoami) >> /tmp/crystal_aio.log 2>&1
+apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine ansible ant -y >> /tmp/crystal_aio.log 2>&1
 
 cat << EOF >> /etc/docker/daemon.json
 {
@@ -352,7 +367,6 @@ service docker start >> /tmp/crystal_aio.log 2>&1
 git clone https://github.com/openstack/storlets >> /tmp/crystal_aio.log 2>&1
 pip install storlets/ >> /tmp/crystal_aio.log 2>&1
 cd storlets
-apt-get -y install ant >> /tmp/crystal_aio.log 2>&1
 ./install_libs.sh >> /tmp/crystal_aio.log 2>&1
 mkdir /home/docker_device/scripts >> /tmp/crystal_aio.log 2>&1
 chown swift:swift /home/docker_device/scripts >> /tmp/crystal_aio.log 2>&1
@@ -361,6 +375,18 @@ cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/ >> /t
 chown root:root /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
 chmod 04755 /home/docker_device/scripts/* >> /tmp/crystal_aio.log 2>&1
 cd ..
+
+# Create Storlet docker runtime
+usermod -aG docker $(whoami) >> /tmp/crystal_aio.log 2>&1
+sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml/c\ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml --connection=local" install/storlets/prepare_storlets_install.sh >> /tmp/crystal_aio.log 2>&1
+install/storlets/prepare_storlets_install.sh dev host >> /tmp/crystal_aio.log 2>&1
+
+cd install/storlets/
+sed -i '/- role: docker_client/c\  #- role: docker_client' docker_cluster.yml >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_user_id": "1003"/c\"swift_user_id": "1010",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_group_id": "1003"/c\"swift_group_id": "1010",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+ansible-playbook -s -i storlets_dynamic_inventory.py docker_cluster.yml --connection=local >> /tmp/crystal_aio.log 2>&1
+docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f
 printf "\tDone!\n"
 
 ##### Initialize Crystal #####
@@ -369,7 +395,7 @@ printf "Initializating Crystal\t\t ... \t95%%"
 echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
 curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
 KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
-curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}'
+curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}' >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
