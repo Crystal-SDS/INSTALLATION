@@ -348,6 +348,7 @@ printf "\tDone!\n"
 ##### Install Storlets #####
 printf "Installing Storlets\t\t ... \t90%%"
 # Install Docker
+cd ~
 apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D >> /tmp/crystal_aio.log 2>&1
 apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log 2>&1
@@ -380,11 +381,11 @@ sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.
 install/storlets/prepare_storlets_install.sh dev host >> /tmp/crystal_aio.log 2>&1
 
 cd install/storlets/
-SWIFT_UID=id -u swift
-SWIFT_GID=id -g swift
+SWIFT_UID=$(id -u swift)
+SWIFT_GID=$(id -g swift)
 sed -i '/- role: docker_client/c\  #- role: docker_client' docker_cluster.yml >> /tmp/crystal_aio.log 2>&1
-sed -i '/"swift_user_id": "1003"/c\"swift_user_id": "$SWIFT_UID",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
-sed -i '/"swift_group_id": "1003"/c\"swift_group_id": "$SWIFT_GID",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_user_id": "1003"/c\\t"swift_user_id": "'$SWIFT_UID'",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
+sed -i '/"swift_group_id": "1003"/c\\t"swift_group_id": "'$SWIFT_GID'",' deploy/cluster_config.json >> /tmp/crystal_aio.log 2>&1
 ansible-playbook -s -i storlets_dynamic_inventory.py docker_cluster.yml --connection=local >> /tmp/crystal_aio.log 2>&1
 docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
@@ -394,13 +395,13 @@ cd ~
 printf "Initializating Crystal\t\t ... \t95%%"
 
 # Initializa Crystal test tenant
-. crystal-openrc
-PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
-docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
-swift post storlet
-swift post dependency
-swift post -H "X-account-meta-storlet-enabled:True"
-swift post -H "X-account-meta-crystal-enabled:True"
+. crystal-openrc >> /tmp/crystal_aio.log 2>&1
+PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}') >> /tmp/crystal_aio.log 2>&1
+docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13} >> /tmp/crystal_aio.log 2>&1
+swift post storlet >> /tmp/crystal_aio.log 2>&1
+swift post dependency >> /tmp/crystal_aio.log 2>&1
+swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
+swift post -H "X-account-meta-crystal-enabled:True" >> /tmp/crystal_aio.log 2>&1
 
 # Put default dashboards to kibana
 /usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
