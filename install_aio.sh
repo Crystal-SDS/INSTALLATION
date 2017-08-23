@@ -118,6 +118,7 @@ EOF
 openstack project create --domain default --description "Crystal Test Project" crystal >> /tmp/crystal_aio.log 2>&1
 openstack user create --domain default --password crystal crystal >> /tmp/crystal_aio.log 2>&1
 openstack role add --project crystal --user crystal admin >> /tmp/crystal_aio.log 2>&1
+openstack role add --project crystal --user manager admin >> /tmp/crystal_aio.log 2>&1
 
 cat << EOF >> crystal-openrc
 export OS_USERNAME=crystal
@@ -394,7 +395,7 @@ cd ~
 ##### Initialize Crystal #####
 printf "Initializating Crystal\t\t ... \t95%%"
 
-# Initializa Crystal test tenant
+# Initialize Crystal test tenant
 . crystal-openrc >> /tmp/crystal_aio.log 2>&1
 PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}') >> /tmp/crystal_aio.log 2>&1
 docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13} >> /tmp/crystal_aio.log 2>&1
@@ -403,12 +404,17 @@ swift post dependency >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-crystal-enabled:True" >> /tmp/crystal_aio.log 2>&1
 
-# Put default dashboards to kibana
+# Load the default dashboards to kibana
 /usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
 echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
 curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
 KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}' >> /tmp/crystal_aio.log 2>&1
+
+# Load default data
+
+
+
 printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
