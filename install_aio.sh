@@ -17,7 +17,7 @@ echo -e "$IP_ADRESS \t controller" >> /etc/hosts
 ###### Install Common ######
 printf "Upgrading Server System\t\t ... \t2%%"
 apt-get install software-properties-common -y >> /tmp/crystal_aio.log 2>&1
-add-apt-repository cloud-archive:ocata -y >> /tmp/crystal_aio.log 2>&1
+add-apt-repository cloud-archive:pike -y >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log
 # apt dist-upgrade -y
 DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade >> /tmp/crystal_aio.log 2>&1
@@ -174,6 +174,7 @@ swift-ring-builder object.builder create 10 1 1 >> /tmp/crystal_aio.log 2>&1
 swift-ring-builder object.builder add --region 1 --zone 1 --ip controller --port 6200 --device sda1 --weight 100 >> /tmp/crystal_aio.log 2>&1
 swift-ring-builder object.builder >> /tmp/crystal_aio.log 2>&1
 swift-ring-builder object.builder rebalance >> /tmp/crystal_aio.log 2>&1
+cd ~
 
 sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
 sed -i 's/#pipeline/pipeline/p' /etc/swift/proxy-server.conf
@@ -237,6 +238,9 @@ pip install pyactor redis pika pytz eventlet djangorestframework django-bootstra
 cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 a2ensite crystal_controller >> /tmp/crystal_aio.log 2>&1
 service apache2 restart >> /tmp/crystal_aio.log 2>&1
+
+mkdir /opt/crystal
+mkdir /opt/crystal/global_controllers
 printf "\tDone!\n"
 
 #### Crystal Dashboard #####
@@ -270,6 +274,10 @@ os_identifier = object_controller
 storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
 execution_server = object
 EOF
+
+mkdir /opt/crystal/global_native_filters
+mkdir /opt/crystal/native_filters
+mkdir /opt/crystal/storlet_filters
 printf "\tDone!\n"
 
 #### Metric middleware #####
@@ -302,6 +310,8 @@ sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
 sed  -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
 
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
+
+mkdir /opt/crystal/workload_metrics
 printf "\tDone!\n"
 
 ####   ELK Stack  ####
@@ -349,7 +359,6 @@ printf "\tDone!\n"
 ##### Install Storlets #####
 printf "Installing Storlets\t\t ... \t90%%"
 # Install Docker
-cd ~
 apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D >> /tmp/crystal_aio.log 2>&1
 apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' >> /tmp/crystal_aio.log 2>&1
 apt-get update >> /tmp/crystal_aio.log 2>&1
@@ -404,7 +413,7 @@ swift post dependency >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-crystal-enabled:True" >> /tmp/crystal_aio.log 2>&1
 
-# Load the default dashboards to kibana
+# Load default dashboards to kibana
 /usr/share/metricbeat/scripts/import_dashboards >> /tmp/crystal_aio.log 2>&1
 echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
 curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}' >> /tmp/crystal_aio.log 2>&1
@@ -412,8 +421,23 @@ KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}' >> /tmp/crystal_aio.log 2>&1
 
 # Load default data
+cp controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
+cp controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
 
+cp metric-middleware/metric_samples/container/* /opt/crystal/workload_metrics
+cp metric-middleware/metric_samples/tenant/* /opt/crystal/workload_metrics
 
+git clone https://github.com/Crystal-SDS/filter-samples
+cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/
+cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/
+cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/
+
+sudo service redis-server stop
+wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb
+mv dump.rdb /var/lib/redis/
+chmod 655 /var/lib/redis/dump.rdb
+chown redis:redis /var/lib/redis/dump.rdb
+sudo service redis-server start
 
 printf "\tDone!\n"
 
