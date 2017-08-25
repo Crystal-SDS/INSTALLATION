@@ -155,9 +155,9 @@ curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/pla
 
 mkdir -p /srv/node/sda1 >> /tmp/crystal_aio.log 2>&1
 mkdir -p /var/cache/swift >> /tmp/crystal_aio.log 2>&1
-chown -R root:swift /var/cache/swift
-chmod -R 775 /var/cache/swift
-chown -R swift:swift /srv/node
+chown -R root:swift /var/cache/swift >> /tmp/crystal_aio.log 2>&1
+chmod -R 775 /var/cache/swift >> /tmp/crystal_aio.log 2>&1
+chown -R swift:swift /srv/node >> /tmp/crystal_aio.log 2>&1
 
 cd /etc/swift
 swift-ring-builder account.builder create 10 1 1 >> /tmp/crystal_aio.log 2>&1
@@ -234,13 +234,14 @@ sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
 service redis restart >> /tmp/crystal_aio.log 2>&1
 
 git clone https://github.com/Crystal-SDS/controller -b dev /usr/share/crystal-controller >> /tmp/crystal_aio.log 2>&1
-pip install pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 >> /tmp/crystal_aio.log 2>&1
+#pip install -U -r /usr/share/crystal-controller/requirements.txt >> /tmp/crystal_aio.log 2>&1
+pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 >> /tmp/crystal_aio.log 2>&1
 cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 a2ensite crystal_controller >> /tmp/crystal_aio.log 2>&1
 service apache2 restart >> /tmp/crystal_aio.log 2>&1
 
-mkdir /opt/crystal
-mkdir /opt/crystal/global_controllers
+mkdir /opt/crystal >> /tmp/crystal_aio.log 2>&1
+mkdir /opt/crystal/global_controllers >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
 #### Crystal Dashboard #####
@@ -248,6 +249,7 @@ printf "Installing Crystal Dashboard\t ... \t50%%"
 git clone https://github.com/Crystal-SDS/dashboard /usr/share/crystal-dashboard >> /tmp/crystal_aio.log 2>&1
 cp /usr/share/crystal-dashboard/crystal_dashboard/enabled/_50_sdscontroller.py /usr/share/openstack-dashboard/openstack_dashboard/enabled/
 cat /usr/share/crystal-dashboard/crystal_dashboard/local/local_settings.py >>  /etc/openstack-dashboard/local_settings.py
+#pip install -U -r /usr/share/crystal-dashboard/requirements.txt >> /tmp/crystal_aio.log 2>&1
 pip install /usr/share/crystal-dashboard >> /tmp/crystal_aio.log 2>&1
 service apache2 restart >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
@@ -275,9 +277,9 @@ storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
 execution_server = object
 EOF
 
-mkdir /opt/crystal/global_native_filters
-mkdir /opt/crystal/native_filters
-mkdir /opt/crystal/storlet_filters
+mkdir /opt/crystal/global_native_filters >> /tmp/crystal_aio.log 2>&1
+mkdir /opt/crystal/native_filters >> /tmp/crystal_aio.log 2>&1
+mkdir /opt/crystal/storlet_filters >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
 #### Metric middleware #####
@@ -311,7 +313,7 @@ sed  -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handle
 
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
 
-mkdir /opt/crystal/workload_metrics
+mkdir /opt/crystal/workload_metrics >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
 ####   ELK Stack  ####
@@ -421,25 +423,24 @@ KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}' >> /tmp/crystal_aio.log 2>&1
 
 # Load default data
-cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
-cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
+cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/ >> /tmp/crystal_aio.log 2>&1
+cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/ >> /tmp/crystal_aio.log 2>&1
 
-cp metric-middleware/metric_samples/container/* /opt/crystal/workload_metrics
-cp metric-middleware/metric_samples/tenant/* /opt/crystal/workload_metrics
+cp metric-middleware/metric_samples/container/* /opt/crystal/workload_metrics >> /tmp/crystal_aio.log 2>&1
+cp metric-middleware/metric_samples/tenant/* /opt/crystal/workload_metrics >> /tmp/crystal_aio.log 2>&1
 
-git clone https://github.com/Crystal-SDS/filter-samples
-cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/
-cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/
-cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/
+git clone https://github.com/Crystal-SDS/filter-samples >> /tmp/crystal_aio.log 2>&1
+cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/ >> /tmp/crystal_aio.log 2>&1
+cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/ >> /tmp/crystal_aio.log 2>&1
+cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/ >> /tmp/crystal_aio.log 2>&1
 
-sudo service redis-server stop
-wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb
-mv dump.rdb /var/lib/redis/
-chmod 655 /var/lib/redis/dump.rdb
-chown redis:redis /var/lib/redis/dump.rdb
-sudo service redis-server start
-sudo swift-init main restart
-sudo service apache2 restart
+sudo service redis-server stop >> /tmp/crystal_aio.log 2>&1
+wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb >> /tmp/crystal_aio.log 2>&1
+mv dump.rdb /var/lib/redis/ >> /tmp/crystal_aio.log 2>&1
+chmod 655 /var/lib/redis/dump.rdb >> /tmp/crystal_aio.log 2>&1
+chown redis:redis /var/lib/redis/dump.rdb >> /tmp/crystal_aio.log 2>&1
+sudo service redis-server start >> /tmp/crystal_aio.log 2>&1
+
 printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
