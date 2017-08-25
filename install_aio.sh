@@ -220,7 +220,7 @@ sed -i '/OPENSTACK_HOST = "127.0.0.1"/c\OPENSTACK_HOST = "controller"' /etc/open
 sed -i '/OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v2.0" % OPENSTACK_HOST/c\OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v3" % OPENSTACK_HOST' /etc/openstack-dashboard/local_settings.py
 sed -i '/OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"/c\OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"' /etc/openstack-dashboard/local_settings.py
 
-chown www-data:www-data -R /var/lib/openstack-dashboard/secret_key
+#chown horizon:horizon -R /var/lib/openstack-dashboard/secret_key
 service apache2 restart >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
@@ -421,8 +421,8 @@ KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}' >> /tmp/crystal_aio.log 2>&1
 
 # Load default data
-cp controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
-cp controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
+cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
+cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
 
 cp metric-middleware/metric_samples/container/* /opt/crystal/workload_metrics
 cp metric-middleware/metric_samples/tenant/* /opt/crystal/workload_metrics
@@ -438,10 +438,11 @@ mv dump.rdb /var/lib/redis/
 chmod 655 /var/lib/redis/dump.rdb
 chown redis:redis /var/lib/redis/dump.rdb
 sudo service redis-server start
-
+sudo swift-init main restart
+sudo service apache2 restart
 printf "\tDone!\n"
 
 printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
 printf "Access to the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"
-printf "Log in with user: manager | password: $MANAGER_PASSWD\n\n"
+printf "Login with, user: manager | password: $MANAGER_PASSWD\n\n"
 
