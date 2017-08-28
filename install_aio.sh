@@ -410,6 +410,7 @@ printf "Initializating Crystal\t\t ... \t95%%"
 . crystal-openrc >> /tmp/crystal_aio.log 2>&1
 PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}') >> /tmp/crystal_aio.log 2>&1
 docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13} >> /tmp/crystal_aio.log 2>&1
+swift-init main restart
 swift post storlet >> /tmp/crystal_aio.log 2>&1
 swift post dependency >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
