@@ -264,7 +264,12 @@ cat << EOF >> /etc/swift/proxy-server.conf
 [filter:crystal_filter_handler]
 use = egg:swift_crystal_filter_middleware#crystal_filter_handler
 os_identifier = proxy_controller
-storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
+storlet_container = storlet
+storlet_dependency = dependency
+storlet_logcontainer = storletlog
+storlet_execute_on_proxy_only = false
+storlet_gateway_module = docker
+storlet_gateway_conf = /etc/swift/storlet_docker_gateway.conf
 execution_server = proxy
 EOF
 
@@ -273,7 +278,12 @@ cat << EOF >> /etc/swift/object-server.conf
 [filter:crystal_filter_handler]
 use = egg:swift_crystal_filter_middleware#crystal_filter_handler
 os_identifier = object_controller
-storlet_gateway_module = storlet_gateway.gateways.docker:StorletGatewayDocker
+storlet_container = storlet
+storlet_dependency = dependency
+storlet_logcontainer = storletlog
+storlet_execute_on_proxy_only = false
+storlet_gateway_module = docker
+storlet_gateway_conf = /etc/swift/storlet_docker_gateway.conf
 execution_server = object
 EOF
 
@@ -306,10 +316,10 @@ rabbit_password = $RABBITMQ_PASSWD
 EOF
 
 sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
-sed  -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
+sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
 
 sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
-sed  -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
+sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
 
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
 
@@ -403,6 +413,24 @@ docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f >> /tmp/crystal_aio.lo
 printf "\tDone!\n"
 cd ~
 
+cat << EOF >> /etc/swift/storlet_docker_gateway.conf
+[DEFAULT]
+lxc_root = /home/docker_device/scopes
+cache_dir = /home/docker_device/cache/scopes
+log_dir = /home/docker_device/logs/scopes
+script_dir = /home/docker_device/scripts
+storlets_dir = /home/docker_device/storlets/scopes
+pipes_dir = /home/docker_device/pipes/scopes
+docker_repo = localhost:5001
+restart_linux_container_timeout = 3
+storlet_timeout = 40
+EOF
+
+cp /etc/swift/proxy-server.conf /etc/swift/storlet-proxy-server.conf >> /tmp/crystal_aio.log 2>&1
+sed -i '/^pipeline =/ d' /etc/swift/storlet-proxy-server.conf >> /tmp/crystal_aio.log 2>&1
+sed -i '/\[pipeline:main\]/a pipeline = proxy-logging cache slo proxy-logging proxy-server' /etc/swift/storlet-proxy-server.conf >> /tmp/crystal_aio.log 2>&1
+
+
 ##### Initialize Crystal #####
 printf "Initializing Crystal\t\t ... \t95%%"
 
@@ -410,7 +438,7 @@ printf "Initializing Crystal\t\t ... \t95%%"
 . crystal-openrc >> /tmp/crystal_aio.log 2>&1
 PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}') >> /tmp/crystal_aio.log 2>&1
 docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13} >> /tmp/crystal_aio.log 2>&1
-swift-init main restart
+swift-init main restart >> /tmp/crystal_aio.log 2>&1
 swift post storlet >> /tmp/crystal_aio.log 2>&1
 swift post dependency >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
@@ -434,6 +462,9 @@ git clone https://github.com/Crystal-SDS/filter-samples >> /tmp/crystal_aio.log 
 cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/ >> /tmp/crystal_aio.log 2>&1
 cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/ >> /tmp/crystal_aio.log 2>&1
 cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/ >> /tmp/crystal_aio.log 2>&1
+cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
+cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
+cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
 
 sudo service redis-server stop >> /tmp/crystal_aio.log 2>&1
 wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb >> /tmp/crystal_aio.log 2>&1
