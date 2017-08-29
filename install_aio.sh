@@ -25,8 +25,8 @@ unset DEBIAN_FRONTEND
 apt-get install python-openstackclient -y >> /tmp/crystal_aio.log 2>&1
 printf "\tDone!\n"
 
-###### Install Memcahce ######
-printf "Installing Memcahce Server\t ... \t4%%"
+###### Install Memcache ######
+printf "Installing Memcache Server\t ... \t4%%"
 apt-get install memcached python-memcache -y >> /tmp/crystal_aio.log 2>&1
 sed -i '/-l 127.0.0.1/c\-l controller' /etc/memcached.conf
 service memcached restart >> /tmp/crystal_aio.log 2>&1
@@ -404,7 +404,7 @@ printf "\tDone!\n"
 cd ~
 
 ##### Initialize Crystal #####
-printf "Initializating Crystal\t\t ... \t95%%"
+printf "Initializing Crystal\t\t ... \t95%%"
 
 # Initialize Crystal test tenant
 . crystal-openrc >> /tmp/crystal_aio.log 2>&1
