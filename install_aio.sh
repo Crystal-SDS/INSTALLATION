@@ -382,6 +382,8 @@ cat << EOF >> /etc/docker/daemon.json
 }
 EOF
 
+mkdir /home/docker_device
+chmod 777 /home/docker_device
 service docker stop >> /tmp/crystal_aio.log 2>&1
 service docker start >> /tmp/crystal_aio.log 2>&1
 
@@ -421,8 +423,8 @@ log_dir = /home/docker_device/logs/scopes
 script_dir = /home/docker_device/scripts
 storlets_dir = /home/docker_device/storlets/scopes
 pipes_dir = /home/docker_device/pipes/scopes
-docker_repo = localhost:5001
-restart_linux_container_timeout = 3
+docker_repo = 
+restart_linux_container_timeout = 5
 storlet_timeout = 40
 EOF
 
@@ -440,7 +442,11 @@ PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}') >> /
 docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13} >> /tmp/crystal_aio.log 2>&1
 swift-init main restart >> /tmp/crystal_aio.log 2>&1
 swift post storlet >> /tmp/crystal_aio.log 2>&1
+swift post -r '*:manager' storlet >> /tmp/crystal_aio.log 2>&1
+swift post -w '*:manager' storlet >> /tmp/crystal_aio.log 2>&1
 swift post dependency >> /tmp/crystal_aio.log 2>&1
+swift post -r '*:manager' dependency >> /tmp/crystal_aio.log 2>&1
+swift post -w '*:manager' dependency >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-storlet-enabled:True" >> /tmp/crystal_aio.log 2>&1
 swift post -H "X-account-meta-crystal-enabled:True" >> /tmp/crystal_aio.log 2>&1
 
