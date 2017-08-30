@@ -199,6 +199,9 @@ sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/account-server.c
 sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/container-server.conf
 sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/object-server.conf
 
+sed -i '/# workers = auto/c\workers = 1' /etc/swift/proxy-server.conf
+sed -i '/# workers = auto/c\workers = 1' /etc/swift/object-server.conf
+
 systemctl stop swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 systemctl disable swift-account-auditor swift-account-reaper swift-account-replicator swift-container-auditor swift-container-replicator swift-container-sync swift-container-updater swift-object-auditor swift-object-reconstructor swift-object-replicator swift-object-updater >> /tmp/crystal_aio.log 2>&1
 swift-init all stop >> /tmp/crystal_aio.log 2>&1
@@ -424,7 +427,7 @@ script_dir = /home/docker_device/scripts
 storlets_dir = /home/docker_device/storlets/scopes
 pipes_dir = /home/docker_device/pipes/scopes
 docker_repo = 
-restart_linux_container_timeout = 5
+restart_linux_container_timeout = 8
 storlet_timeout = 40
 EOF
 

@@ -36,7 +36,7 @@ chmod 777 install_aio.sh
 sudo ./install_aio.sh
 ```
 
-The script first installs Keystone, Swift and Horizon (Ocata version), then it proceeds to install all the Crystal packages. Note that the script uses weak passwords for the installed services, so if you want more secure services, please change them at the top of the script.
+The script first installs Keystone, Swift and Horizon (Pike release), then it proceeds to install all the Crystal packages. Note that the script uses weak passwords for the installed services, so if you want more secure services, please change them at the top of the script.
 
 By default, the script has low verbosity. To see the full installation log, run the following command in another terminal:
 
