@@ -225,6 +225,9 @@ install_openstack_horizon() {
 	OPENSTACK_API_VERSIONS = {
 	    "identity": 3,
 	}
+	LANGUAGES = (
+     ('en', 'English'),
+	)
 	EOF
 	
 	sed -i '/OPENSTACK_HOST = "127.0.0.1"/c\OPENSTACK_HOST = "controller"' /etc/openstack-dashboard/local_settings.py
