@@ -214,7 +214,6 @@ install_openstack_swift(){
 	swift-init all stop
 	#usermod -u 1010 swift
 	#groupmod -g 1010 swift
-	swift-init main restart
 }
 
 
@@ -226,16 +225,13 @@ install_openstack_horizon() {
 	    "identity": 3,
 	}
 	LANGUAGES = (
-     ('en', 'English'),
+		('en', 'English'),
 	)
 	EOF
 	
 	sed -i '/OPENSTACK_HOST = "127.0.0.1"/c\OPENSTACK_HOST = "controller"' /etc/openstack-dashboard/local_settings.py
 	sed -i '/OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v2.0" % OPENSTACK_HOST/c\OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v3" % OPENSTACK_HOST' /etc/openstack-dashboard/local_settings.py
 	sed -i '/OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"/c\OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"' /etc/openstack-dashboard/local_settings.py
-	
-	#chown horizon:horizon -R /var/lib/openstack-dashboard/secret_key
-	service apache2 restart
 }
 
 
@@ -252,7 +248,6 @@ install_crystal_controller() {
 	pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3
 	cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 	a2ensite crystal_controller
-	service apache2 restart
 	
 	mkdir /opt/crystal
 	mkdir /opt/crystal/global_controllers
@@ -265,7 +260,6 @@ install_crystal_dashboard() {
 	cp dashboard/crystal_dashboard/enabled/_50_sdscontroller.py /usr/share/openstack-dashboard/openstack_dashboard/enabled/
 	cat dashboard/crystal_dashboard/local/local_settings.py >> /etc/openstack-dashboard/local_settings.py
 	pip install dashboard/
-	service apache2 restart
 }
 
 
@@ -337,8 +331,6 @@ install_crystal_metric_middleware(){
 	sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
 	
-	swift-init main restart
-	
 	mkdir /opt/crystal/workload_metrics
 }
 
@@ -378,10 +370,6 @@ install_elk(){
 	systemctl enable kibana
 	systemctl enable metricbeat
 	
-	service elasticsearch restart
-	service logstash restart
-	service kibana restart
-	service metricbeat restart
 }
 
 
@@ -488,12 +476,23 @@ initialize_crystal(){
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
 	
-	sudo service redis-server stop
+	service redis-server stop
 	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb
 	mv dump.rdb /var/lib/redis/
 	chmod 655 /var/lib/redis/dump.rdb
 	chown redis:redis /var/lib/redis/dump.rdb
-	sudo service redis-server start
+	service redis-server start
+}
+
+
+##### Restart Main Services #####
+restart_services(){
+	service elasticsearch restart
+	service logstash restart
+	service kibana restart
+	service metricbeat restart
+	swift-init main restart
+	service apache2 restart
 }
 
 
@@ -534,6 +533,7 @@ install_crystal(){
 	printf "Initializing Crystal\t\t ... \t95%%"
 	initialize_crystal >> $LOG 2>&1; printf "\tDone!\n"
 	
+	restart_services >> $LOG 2>&1;
 	printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
 	printf "Access to the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"
 	printf "Login with, user: manager | password: $CRYSTAL_MANAGER_PASSWD\n\n"
