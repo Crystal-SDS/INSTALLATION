@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 #########  PASSWORDS  #########
 MYSQL_PASSWD=root
 RABBITMQ_PASSWD=openstack
@@ -372,6 +371,11 @@ install_elk(){
 	systemctl enable kibana
 	systemctl enable metricbeat
 	
+	service elasticsearch restart
+	service logstash restart
+	service kibana restart
+	service metricbeat restart
+	
 }
 
 
@@ -489,10 +493,6 @@ initialize_crystal(){
 
 ##### Restart Main Services #####
 restart_services(){
-	service elasticsearch restart
-	service logstash restart
-	service kibana restart
-	service metricbeat restart
 	swift-init main restart
 	service apache2 restart
 }
