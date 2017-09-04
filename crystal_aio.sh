@@ -222,6 +222,7 @@ install_openstack_swift(){
 install_openstack_horizon() {
 	apt-get install openstack-dashboard -y
 	cat <<-EOF >> /etc/openstack-dashboard/local_settings.py
+	
 	OPENSTACK_API_VERSIONS = {
 	    "identity": 3,
 	}
