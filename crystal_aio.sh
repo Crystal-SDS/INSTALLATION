@@ -239,7 +239,7 @@ install_openstack_horizon() {
 
 #### Crystal Controller #####
 install_crystal_controller() {
-	apt-get install python-pip python-dev -y
+	apt-get install python-pip python-dev sshpass -y
 	pip install -U pip
 	
 	apt-get install redis-server -y
@@ -247,7 +247,7 @@ install_crystal_controller() {
 	service redis restart
 	
 	git clone https://github.com/Crystal-SDS/controller -b dev /usr/share/crystal-controller
-	pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3
+	pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 ssh_paramiko
 	cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 	a2ensite crystal_controller
 	
@@ -352,6 +352,7 @@ install_elk(){
 	apt-get install -y elasticsearch logstash kibana metricbeat
 	
 	sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
+	sed -i '/#logging.dest: stdout/c\logging.dest: /var/log/kibana/kibana.log' /etc/kibana/kibana.yml
 	
 	cat <<-EOF >> /etc/logstash/conf.d/logstash.conf
 	input {
@@ -366,6 +367,9 @@ install_elk(){
 	   }
 	}
 	EOF
+	
+	mkdir /var/log/kibana
+	chown kibana:kibana /var/log/kibana
 	
 	systemctl enable elasticsearch 
 	systemctl enable logstash
@@ -482,6 +486,8 @@ initialize_crystal(){
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
+	
+	chown -R crystal:crystal /opt/crystal
 	
 	service redis-server stop
 	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb
