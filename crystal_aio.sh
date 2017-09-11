@@ -314,6 +314,8 @@ install_crystal_metric_middleware(){
 	[filter:crystal_metric_handler]
 	use = egg:swift_crystal_metric_middleware#crystal_metric_handler
 	execution_server = proxy
+	region_id = 1
+	zone_id = 1
 	rabbit_username = openstack
 	rabbit_password = $RABBITMQ_PASSWD
 	EOF
@@ -323,6 +325,8 @@ install_crystal_metric_middleware(){
 	[filter:crystal_metric_handler]
 	use = egg:swift_crystal_metric_middleware#crystal_metric_handler
 	execution_server = object
+	region_id = 1
+	zone_id = 1
 	rabbit_username = openstack
 	rabbit_password = $RABBITMQ_PASSWD
 	EOF
@@ -467,17 +471,17 @@ initialize_crystal(){
 	
 	# Load default dashboards to kibana
 	/usr/share/metricbeat/scripts/import_dashboards
-	echo -n '{"@timestamp":"2017-08-02T17:10:04.700Z","metric_name":"get_ops","host":"controller","@version":"1","metric_target":"management","value":0}' >/dev/udp/localhost/5400
+	echo -n '{"container": "crystal/data", "metric_name": "bandwidth", "@timestamp": "2017-09-15T18:00:18.331492+02:00", "value": 16.4375, "project": "crystal", "host": "controller", "method": "GET"}' >/dev/udp/localhost/5400
 	curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}'
 	KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 	curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}'
+	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dashboard.json
 	
 	# Load default data
 	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
 	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
 	
-	cp metric-middleware/metric_samples/container/* /opt/crystal/workload_metrics
-	cp metric-middleware/metric_samples/tenant/* /opt/crystal/workload_metrics
+	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
 	
 	git clone https://github.com/Crystal-SDS/filter-samples
 	cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/
