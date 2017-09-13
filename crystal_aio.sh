@@ -471,7 +471,7 @@ initialize_crystal(){
 	
 	# Load default dashboards to kibana
 	/usr/share/metricbeat/scripts/import_dashboards
-	echo -n '{"container": "crystal/data", "metric_name": "bandwidth", "@timestamp": "2017-09-15T18:00:18.331492+02:00", "value": 16.4375, "project": "crystal", "host": "controller", "method": "GET"}' >/dev/udp/localhost/5400
+	echo -n '{"container": "crystal/data", "metric_name": "bandwidth", "@timestamp": "2017-09-15T18:00:18.331492+02:00", "value": 16.4375, "project": "crystal", "host": "controller", "method": "GET", "server_type": "proxy"}' >/dev/udp/localhost/5400
 	curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}'
 	KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 	curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}'
