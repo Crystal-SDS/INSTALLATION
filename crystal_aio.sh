@@ -252,7 +252,7 @@ install_crystal_controller() {
 	a2ensite crystal_controller
 	
 	mkdir /opt/crystal
-	mkdir /opt/crystal/global_controllers
+	mkdir /opt/crystal/controllers
 }
 
 
@@ -297,8 +297,7 @@ install_crystal_filter_middleware(){
 	storlet_gateway_conf = /etc/swift/storlet_docker_gateway.conf
 	execution_server = object
 	EOF
-	
-	mkdir /opt/crystal/global_native_filters
+
 	mkdir /opt/crystal/native_filters
 	mkdir /opt/crystal/storlet_filters
 }
@@ -478,13 +477,13 @@ initialize_crystal(){
 	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dashboard.json
 	
 	# Load default data
-	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/global_controllers/
-	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/global_controllers/
+	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/controllers/
+	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/controllers/
 	
 	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
 	
 	git clone https://github.com/Crystal-SDS/filter-samples
-	cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/global_native_filters/
+	cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/native_filters/
 	cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
