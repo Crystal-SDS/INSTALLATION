@@ -246,7 +246,7 @@ install_crystal_controller() {
 	sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
 	service redis restart
 	
-	git clone https://github.com/Crystal-SDS/controller -b dev /usr/share/crystal-controller
+	git clone https://github.com/Crystal-SDS/controller /usr/share/crystal-controller
 	pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 ssh_paramiko
 	cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 	a2ensite crystal_controller
@@ -477,8 +477,7 @@ initialize_crystal(){
 	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dashboard.json
 	
 	# Load default data
-	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_bandwidth.py /opt/crystal/controllers/
-	cp /usr/share/crystal-controller/bandwidth_controller_samples/static_replication_bandwidth.py /opt/crystal/controllers/
+	cp /usr/share/crystal-controller/controller_samples/static_bandwidth.py /opt/crystal/controllers/
 	
 	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
 	
