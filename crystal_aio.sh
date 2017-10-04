@@ -474,7 +474,6 @@ initialize_crystal(){
 	curl -XPUT http://localhost:9200/.kibana/index-pattern/logstash-* -d '{"title" : "logstash-*",  "timeFieldName": "@timestamp"}'
 	KIBANA_VERSION=$(dpkg -s kibana | grep -i version | awk '{print $2}')
 	curl -XPUT http://localhost:9200/.kibana/config/$KIBANA_VERSION -d '{"defaultIndex" : "logstash-*"}'
-	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dashboard.json
 	
 	# Load default data
 	cp /usr/share/crystal-controller/controller_samples/static_bandwidth.py /opt/crystal/controllers/
