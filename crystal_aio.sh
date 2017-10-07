@@ -104,10 +104,13 @@ install_openstack_keystone(){
 	
 	source admin-openrc
 	openstack role create user
+	openstack role create ResellerAdmin
 	openstack project create --domain default --description "Service Project" service
 	openstack project create --domain default --description "Management Project" management
 	openstack user create --domain default --password $CRYSTAL_MANAGER_PASSWD manager
 	openstack role add --project management --user manager admin
+	openstack role add --project management --user manager ResellerAdmin
+	openstack role add --domain default --user manager ResellerAdmin
 	
 	cat <<-EOF >> manager-openrc
 	export OS_USERNAME=manager
