@@ -125,8 +125,9 @@ install_openstack_keystone(){
 	# create Crystal tenant and user
 	openstack project create --domain default --description "Crystal Test Project" crystal
 	openstack user create --domain default --password crystal crystal
-	openstack role add --project crystal --user crystal admin
+	openstack role add --project crystal --user crystal user
 	openstack role add --project crystal --user manager admin
+	openstack role add --project crystal --user manager ResellerAdmin
 	
 	cat <<-EOF >> crystal-openrc
 	export OS_USERNAME=crystal
@@ -334,7 +335,7 @@ install_crystal_metric_middleware(){
 	EOF
 	
 	sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
-	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
+	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler copy slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
 	
 	sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
@@ -484,9 +485,12 @@ initialize_crystal(){
 	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
 	
 	git clone https://github.com/Crystal-SDS/filter-samples
-	cp filter-samples/Native_bandwidth_differentiation/crystal_bandwidth_control.py /opt/crystal/native_filters/
-	cp filter-samples/Native_noop/crystal_noop_filter.py /opt/crystal/native_filters/
-	cp filter-samples/Native_cache/crystal_cache_control.py /opt/crystal/native_filters/
+	cp filter-samples/Native_bandwidth_differentiation/bandwidth_control_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_cache/cache_control_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_noop/noop_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_metadata_blocke/metadata_blocker_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_recycle_bin/recyclebin_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_tag/tagging_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
