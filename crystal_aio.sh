@@ -202,7 +202,7 @@ install_openstack_swift(){
 	sed -i '/# delay_auth_decision = False/c\delay_auth_decision = True \nmemcached_servers = controller:11211' /etc/swift/proxy-server.conf
 	sed -i '/# \[filter:keystoneauth]/c\[filter:keystoneauth]' /etc/swift/proxy-server.conf
 	sed -i '/# use = egg:swift#keystoneauth/c\use = egg:swift#keystoneauth' /etc/swift/proxy-server.conf
-	sed -i '/# operator_roles = admin, swiftoperator/c\operator_roles = admin, user' /etc/swift/proxy-server.conf
+	sed -i '/# operator_roles = admin, swiftoperator/c\operator_roles = admin, swiftoperator' /etc/swift/proxy-server.conf
 	sed -i '/# memcache_servers = 127.0.0.1:11211/c\memcache_servers = controller:11211' /etc/swift/proxy-server.conf
 	
 	sed -i '/# mount_check = true/c\mount_check = false' /etc/swift/account-server.conf
@@ -268,6 +268,18 @@ install_crystal_dashboard() {
 	pip install dashboard/
 }
 
+#### ACL middleware #####
+install_crystal_acl_middleware(){
+	git clone https://github.com/Crystal-SDS/acl-middleware
+	pip install acl-middleware/
+	
+	cat <<-EOF >> /etc/swift/proxy-server.conf
+	
+	[filter:crystal_acl]
+	use = egg:swift_crystal_acl_middleware#crystal_acl
+	EOF
+
+}
 
 #### Filter middleware #####
 install_crystal_filter_middleware(){
@@ -276,9 +288,8 @@ install_crystal_filter_middleware(){
 	
 	cat <<-EOF >> /etc/swift/proxy-server.conf
 	
-	[filter:crystal_filter_handler]
+	[filter:crystal_filters]
 	use = egg:swift_crystal_filter_middleware#crystal_filter_handler
-	os_identifier = proxy_controller
 	storlet_container = storlet
 	storlet_dependency = dependency
 	storlet_logcontainer = storletlog
@@ -290,9 +301,8 @@ install_crystal_filter_middleware(){
 	
 	cat <<-EOF >> /etc/swift/object-server.conf
 	
-	[filter:crystal_filter_handler]
+	[filter:crystal_filters]
 	use = egg:swift_crystal_filter_middleware#crystal_filter_handler
-	os_identifier = object_controller
 	storlet_container = storlet
 	storlet_dependency = dependency
 	storlet_logcontainer = storletlog
@@ -314,7 +324,7 @@ install_crystal_metric_middleware(){
 	
 	cat <<-EOF >> /etc/swift/proxy-server.conf
 	
-	[filter:crystal_metric_handler]
+	[filter:crystal_metrics]
 	use = egg:swift_crystal_metric_middleware#crystal_metric_handler
 	execution_server = proxy
 	region_id = 1
@@ -325,7 +335,7 @@ install_crystal_metric_middleware(){
 	
 	cat <<-EOF >> /etc/swift/object-server.conf
 	
-	[filter:crystal_metric_handler]
+	[filter:crystal_metrics]
 	use = egg:swift_crystal_metric_middleware#crystal_metric_handler
 	execution_server = object
 	region_id = 1
@@ -335,10 +345,10 @@ install_crystal_metric_middleware(){
 	EOF
 	
 	sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
-	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken keystoneauth container-quotas account-quotas crystal_metric_handler crystal_filter_handler copy slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
+	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken crystal_acl keystoneauth container-quotas account-quotas crystal_metrics crystal_filters copy slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
 	
 	sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
-	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metric_handler crystal_filter_handler object-server' /etc/swift/object-server.conf
+	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metrics crystal_filters object-server' /etc/swift/object-server.conf
 	
 	mkdir /opt/crystal/workload_metrics
 }
