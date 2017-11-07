@@ -256,7 +256,9 @@ install_crystal_controller() {
 	a2ensite crystal_controller
 	
 	mkdir /opt/crystal
-	mkdir /opt/crystal/controllers
+	mkdir -p /opt/crystal/controllers
+	mkdir -p /opt/crystal/swift/tmp
+	mkdir -p /opt/crystal/swift/deploy
 }
 
 
