@@ -292,8 +292,8 @@ install_crystal_filter_middleware(){
 	
 	[filter:crystal_filters]
 	use = egg:swift_crystal_filter_middleware#crystal_filter_handler
-	storlet_container = storlet
-	storlet_dependency = dependency
+	storlet_container = .storlet
+	storlet_dependency = .dependency
 	storlet_logcontainer = storletlog
 	storlet_execute_on_proxy_only = false
 	storlet_gateway_module = docker
@@ -305,8 +305,8 @@ install_crystal_filter_middleware(){
 	
 	[filter:crystal_filters]
 	use = egg:swift_crystal_filter_middleware#crystal_filter_handler
-	storlet_container = storlet
-	storlet_dependency = dependency
+	storlet_container = .storlet
+	storlet_dependency = .dependency
 	storlet_logcontainer = storletlog
 	storlet_execute_on_proxy_only = false
 	storlet_gateway_module = docker
@@ -475,12 +475,12 @@ initialize_crystal(){
 	PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
 	docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
 	swift-init main restart
-	swift post storlet
-	swift post -r '*:manager' storlet
-	swift post -w '*:manager' storlet
-	swift post dependency
-	swift post -r '*:manager' dependency
-	swift post -w '*:manager' dependency
+	swift post .storlet
+	#swift post -r '*:manager' storlet
+	#swift post -w '*:manager' storlet
+	#swift post dependency
+	#swift post -r '*:manager' dependency
+	#swift post -w '*:manager' dependency
 	swift post -H "X-account-meta-storlet-enabled:True"
 	swift post -H "X-account-meta-crystal-enabled:True"
 	
