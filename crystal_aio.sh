@@ -423,7 +423,7 @@ install_storlets(){
 	service docker start
 	
 	# Install Storlets
-	git clone https://github.com/openstack/storlets
+	git clone https://github.com/openstack/storlets -b stable/pike
 	pip install storlets/
 	cd storlets
 	./install_libs.sh
