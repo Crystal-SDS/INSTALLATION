@@ -476,7 +476,7 @@ initialize_crystal(){
 	docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
 	swift-init main restart
 	swift post .storlet
-	#swift post -r '*:manager' storlet
+	# swift post -r '*:manager' storlet
 	#swift post -w '*:manager' storlet
 	#swift post dependency
 	#swift post -r '*:manager' dependency
@@ -500,14 +500,15 @@ initialize_crystal(){
 	cp filter-samples/Native_bandwidth_differentiation/bandwidth_control_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_cache/cache_control_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_noop/noop_filter.py /opt/crystal/native_filters/
-	cp filter-samples/Native_metadata_blocke/metadata_blocker_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_recycle_bin/recyclebin_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_tag/tagging_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_crypto/tagging_filter.py /opt/crystal/native_filters/
+	
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
 	
-	chown -R crystal:crystal /opt/crystal
+	chown -R www-data:www-data /opt/crystal
 	
 	service redis-server stop
 	wget https://raw.githubusercontent.com/Crystal-SDS/INSTALLATION/master/dump.rdb
@@ -550,6 +551,9 @@ install_crystal(){
 	install_crystal_controller >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing Crystal Dashboard\t ... \t50%%"
 	install_crystal_dashboard >> $LOG 2>&1; printf "\tDone!\n"
+	
+	printf "Installing Crystal Dashboard\t ... \t55%%"
+	install_crystal_acl_middleware >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing Filter Middleware\t ... \t60%%"
 	install_crystal_filter_middleware >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing Metric middleware\t ... \t70%%"
