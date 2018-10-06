@@ -15,20 +15,22 @@ upgrade_system(){
 	echo -e "127.0.0.1 \t localhost" > /etc/hosts
 	IP_ADRESS=$(hostname -I | tr -d '[:space:]')
 	echo -e "$IP_ADRESS \t controller" >> /etc/hosts
+	#ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
-	apt-get install software-properties-common -y
+	add-apt-repository universe
+	apt install software-properties-common -y
 	add-apt-repository cloud-archive:pike -y
-	apt-get update
-	# apt dist-upgrade -y
-	DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
+	apt update
+
+	DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
 	unset DEBIAN_FRONTEND
-	apt-get install python-openstackclient -y
+	apt install python-openstackclient -y
 }
 
 
-###### Install Memcache ######
+###### Install Memcached ######
 install_memcache_server(){
-	apt-get install memcached python-memcache -y
+	apt install memcached python-memcache -y
 	sed -i '/-l 127.0.0.1/c\-l controller' /etc/memcached.conf
 	service memcached restart
 }
@@ -36,7 +38,7 @@ install_memcache_server(){
 
 ###### Install RabbitMQ ######
 install_rabbitmq_server(){
-	apt-get install rabbitmq-server -y
+	apt install rabbitmq-server -y
 	rabbitmqctl add_user openstack $RABBITMQ_PASSWD
 	rabbitmqctl set_user_tags openstack administrator
 	rabbitmqctl set_permissions openstack ".*" ".*" ".*"
@@ -48,9 +50,9 @@ install_rabbitmq_server(){
 install_mysql_server(){
 
 	export DEBIAN_FRONTEND=noninteractive
-	sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password password $MYSQL_PASSWD'
-	sudo debconf-set-selections <<< 'mariadb-server-10.0 mysql-server/root_password_again password $MYSQL_PASSWD'
-	apt-get install mariadb-server python-pymysql -y
+	debconf-set-selections <<< "mariadb-server-10.0 mysql-server/root_password password $MYSQL_PASSWD"
+	debconf-set-selections <<< "mariadb-server-10.0 mysql-server/root_password_again password $MYSQL_PASSWD"
+	apt install mariadb-server python-pymysql -y
 	unset DEBIAN_FRONTEND
 	
 	mysql -uroot -p$MYSQL_PASSWD -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
@@ -78,10 +80,11 @@ install_openstack_keystone(){
 	mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone'"
 	mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone'"
 	
-	apt-get install keystone -y
+	apt install keystone apache2 libapache2-mod-wsgi -y
 	
 	sed -i '/connection =/c\connection = mysql+pymysql://keystone:keystone@controller/keystone' /etc/keystone/keystone.conf
 	sed -i '/#provider = fernet/c\provider = fernet' /etc/keystone/keystone.conf
+	
 	
 	su -s /bin/sh -c "keystone-manage db_sync" keystone
 	keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
@@ -89,9 +92,9 @@ install_openstack_keystone(){
 	keystone-manage bootstrap --bootstrap-password $KEYSTONE_ADMIN_PASSWD --bootstrap-admin-url http://controller:35357/v3/ --bootstrap-internal-url http://controller:5000/v3/ --bootstrap-public-url http://controller:5000/v3/ --bootstrap-region-id RegionOne
 	
 	echo "ServerName controller" >> /etc/apache2/apache2.conf
-	service apache2 restart
 	rm -f /var/lib/keystone/keystone.db
-	
+	service apache2 restart
+		
 	cat <<-EOF >> admin-openrc
 	export OS_USERNAME=admin
 	export OS_PASSWORD=$KEYSTONE_ADMIN_PASSWD
@@ -125,7 +128,9 @@ install_openstack_keystone(){
 	# create Crystal tenant and user
 	openstack project create --domain default --description "Crystal Test Project" crystal
 	openstack user create --domain default --password crystal crystal
-	openstack role add --project crystal --user crystal user
+	#openstack role add --project crystal --user crystal user
+	openstack role add --project crystal --user crystal admin
+	openstack role add --project crystal --user crystal ResellerAdmin
 	openstack role add --project crystal --user manager admin
 	openstack role add --project crystal --user manager ResellerAdmin
 	
@@ -140,6 +145,23 @@ install_openstack_keystone(){
 	EOF
 }
 
+###### OpenStak Horizon ######
+install_openstack_horizon() {
+	apt install openstack-dashboard -y
+	cat <<-EOF >> /etc/openstack-dashboard/local_settings.py
+	
+	OPENSTACK_API_VERSIONS = {
+	    "identity": 3,
+	}
+	LANGUAGES = (
+		('en', 'English'),
+	)
+	EOF
+	
+	sed -i '/OPENSTACK_HOST = "127.0.0.1"/c\OPENSTACK_HOST = "controller"' /etc/openstack-dashboard/local_settings.py
+	sed -i '/OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v2.0" % OPENSTACK_HOST/c\OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v3" % OPENSTACK_HOST' /etc/openstack-dashboard/local_settings.py
+	sed -i '/OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"/c\OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"' /etc/openstack-dashboard/local_settings.py
+}
 
 ###### Install Swift ######
 install_openstack_swift(){
@@ -152,23 +174,23 @@ install_openstack_swift(){
 	openstack endpoint create --region RegionOne object-store internal http://controller:8080/v1/AUTH_%\(tenant_id\)s
 	openstack endpoint create --region RegionOne object-store admin http://controller:8080/v1
 	
-	apt-get install swift swift-proxy python-swiftclient python-keystoneclient python-keystonemiddleware memcached -y
-	apt-get install xfsprogs rsync -y
-	apt-get install swift swift-account swift-container swift-object -y
+	apt install swift swift-proxy swift-account swift-container swift-object -y
+	apt install python-swiftclient python-keystoneclient python-keystonemiddleware memcached -y
+	apt install xfsprogs rsync -y
 	
 	mkdir /etc/swift
-	curl -o /etc/swift/proxy-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/proxy-server.conf-sample?h=stable/ocata
-	curl -o /etc/swift/account-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/account-server.conf-sample?h=stable/ocata
-	curl -o /etc/swift/container-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/container-server.conf-sample?h=stable/ocata
-	curl -o /etc/swift/object-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/object-server.conf-sample?h=stable/ocata
-	curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/swift.conf-sample?h=stable/ocata
+	curl -o /etc/swift/proxy-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/proxy-server.conf-sample?h=stable/pike
+	curl -o /etc/swift/account-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/account-server.conf-sample?h=stable/pike
+	curl -o /etc/swift/container-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/container-server.conf-sample?h=stable/pike
+	curl -o /etc/swift/object-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/object-server.conf-sample?h=stable/pike
+	curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/swift.conf-sample?h=stable/pike
 	
 	mkdir -p /srv/node/sda1
 	mkdir -p /var/cache/swift
 	chown -R root:swift /var/cache/swift
 	chmod -R 775 /var/cache/swift
 	chown -R swift:swift /srv/node
-	
+			
 	cd /etc/swift
 	swift-ring-builder account.builder create 10 1 1
 	swift-ring-builder account.builder add --region 1 --zone 1 --ip controller --port 6202 --device sda1 --weight 100
@@ -198,7 +220,7 @@ install_openstack_swift(){
 	sed -i '/# user_domain_id = default/c\user_domain_name = default' /etc/swift/proxy-server.conf
 	sed -i '/# project_name = service/c\project_name = service' /etc/swift/proxy-server.conf
 	sed -i '/# username = swift/c\username = swift' /etc/swift/proxy-server.conf
-	sed -i '/# password = password/c\password = swift' /etc/swift/proxy-server.conf
+	sed -i '/# password = password/c\password = swift \nservice_token_roles_required = True' /etc/swift/proxy-server.conf
 	sed -i '/# delay_auth_decision = False/c\delay_auth_decision = True \nmemcached_servers = controller:11211' /etc/swift/proxy-server.conf
 	sed -i '/# \[filter:keystoneauth]/c\[filter:keystoneauth]' /etc/swift/proxy-server.conf
 	sed -i '/# use = egg:swift#keystoneauth/c\use = egg:swift#keystoneauth' /etc/swift/proxy-server.conf
@@ -219,42 +241,26 @@ install_openstack_swift(){
 	swift-init all stop
 	#usermod -u 1010 swift
 	#groupmod -g 1010 swift
-}
-
-
-###### OpenStak Horizon ######
-install_openstack_horizon() {
-	apt-get install openstack-dashboard -y
-	cat <<-EOF >> /etc/openstack-dashboard/local_settings.py
 	
-	OPENSTACK_API_VERSIONS = {
-	    "identity": 3,
-	}
-	LANGUAGES = (
-		('en', 'English'),
-	)
-	EOF
-	
-	sed -i '/OPENSTACK_HOST = "127.0.0.1"/c\OPENSTACK_HOST = "controller"' /etc/openstack-dashboard/local_settings.py
-	sed -i '/OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v2.0" % OPENSTACK_HOST/c\OPENSTACK_KEYSTONE_URL = "http:\/\/%s:5000\/v3" % OPENSTACK_HOST' /etc/openstack-dashboard/local_settings.py
-	sed -i '/OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"/c\OPENSTACK_KEYSTONE_DEFAULT_ROLE = "user"' /etc/openstack-dashboard/local_settings.py
 }
 
 
 #### Crystal Controller #####
 install_crystal_controller() {
-	apt-get install python-pip python-dev sshpass -y
-	pip install -U pip
+	apt install python-pip python-dev sshpass -y
+	#pip install -U pip
 	
-	apt-get install redis-server -y
+	apt install redis-server -y
 	sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
 	service redis restart
 	
 	git clone https://github.com/Crystal-SDS/controller /usr/share/crystal-controller
-	pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 ssh_paramiko
+	pip install -r /usr/share/crystal-controller/requirements.txt
+	#pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 ssh_paramiko
 	cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 	a2ensite crystal_controller
 	
+	chown crystal:crystal /etc/swift
 	mkdir /opt/crystal
 	mkdir -p /opt/crystal/controllers
 	mkdir -p /opt/crystal/swift/tmp
@@ -346,8 +352,9 @@ install_crystal_metric_middleware(){
 	rabbit_password = $RABBITMQ_PASSWD
 	EOF
 	
+		
 	sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
-	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk ratelimit authtoken crystal_acl keystoneauth container-quotas account-quotas crystal_metrics crystal_filters copy slo dlo proxy-logging proxy-server' /etc/swift/proxy-server.conf
+	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk tempurl ratelimit authtoken crystal_acl keystoneauth copy container-quotas account-quotas crystal_metrics crystal_filters copy slo dlo versioned_writes proxy-logging proxy-server' /etc/swift/proxy-server.conf
 	
 	sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metrics crystal_filters object-server' /etc/swift/object-server.conf
@@ -359,16 +366,16 @@ install_crystal_metric_middleware(){
 ####   ELK Stack  ####
 install_elk(){
 	add-apt-repository -y ppa:webupd8team/java
-	apt-get update
+	apt update
+	apt install openjdk-8-jdk openjdk-8-jre -y
 	#echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
 	#echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections
-	#apt-get -y install oracle-java8-installer
-	apt-get -y install openjdk-8-jdk openjdk-8-jre
+	#apt install oracle-java8-installer -y
 	
 	wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
 	echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list
-	apt-get update
-	apt-get install -y elasticsearch logstash kibana metricbeat
+	apt update
+	apt install elasticsearch logstash kibana metricbeat -y
 	
 	sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
 	sed -i '/#logging.dest: stdout/c\logging.dest: /var/log/kibana/kibana.log' /etc/kibana/kibana.yml
@@ -406,10 +413,10 @@ install_elk(){
 ##### Install Storlets #####
 install_storlets(){
 	# Install Docker
-	apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-	apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
-	apt-get update
-	apt-get install aufs-tools linux-image-generic-lts-xenial apt-transport-https docker-engine ansible ant -y
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+	sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
+	apt update
+	apt install aufs-tools linux-image-generic apt-transport-https docker-ce ansible ant -y
 	
 	cat <<-EOF >> /etc/docker/daemon.json
 	{
@@ -475,6 +482,7 @@ initialize_crystal(){
 	PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
 	docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
 	swift-init main restart
+
 	swift post .storlet
 	# swift post -r '*:manager' storlet
 	#swift post -w '*:manager' storlet
@@ -498,11 +506,11 @@ initialize_crystal(){
 	
 	git clone https://github.com/Crystal-SDS/filter-samples
 	cp filter-samples/Native_bandwidth_differentiation/bandwidth_control_filter.py /opt/crystal/native_filters/
-	cp filter-samples/Native_cache/cache_control_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_cache/caching_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_noop/noop_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_recycle_bin/recyclebin_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_tag/tagging_filter.py /opt/crystal/native_filters/
-	cp filter-samples/Native_crypto/tagging_filter.py /opt/crystal/native_filters/
+	cp filter-samples/Native_crypto/crypto_filter.py /opt/crystal/native_filters/
 	
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
@@ -542,11 +550,11 @@ install_crystal(){
 	
 	printf "Installing OpenStack Keystone\t ... \t10%%"
 	install_openstack_keystone >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing OpenStack Swift\t ... \t20%%"
-	install_openstack_swift >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing OpenStack Horizon\t ... \t30%%"
+	printf "Installing OpenStack Horizon\t ... \t20%%"
 	install_openstack_horizon >> $LOG 2>&1; printf "\tDone!\n"
-
+	printf "Installing OpenStack Swift\t ... \t30%%"
+	install_openstack_swift >> $LOG 2>&1; printf "\tDone!\n"
+	
 	printf "Installing Crystal Controller\t ... \t40%%"
 	install_crystal_controller >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing Crystal Dashboard\t ... \t50%%"
@@ -588,17 +596,20 @@ usage(){
 
 COMMAND="$1"
 main(){
-	case $COMMAND in
-	  "install" )
-	    install_crystal
-	    ;;
-	
-	  "update" )
-	    update_crystal
-	    ;;
-	  * )
-	    usage
-	esac
+	if [[ `lsb_release -rs` == "16.04" ]]
+	then
+		case $COMMAND in
+		  "install" )
+		    install_crystal
+		    ;;
+		
+		  "update" )
+		    update_crystal
+		    ;;
+		  * )
+		    install_crystal
+		esac
+	fi
 }
 
 main
