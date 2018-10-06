@@ -55,7 +55,7 @@ It also includes an extended version of the OpenStack Dashboard that simplifies 
 
 Download the Development VM from the following URL:
 
-* ftp://ast2-deim.urv.cat/s2caio_vm
+* [ftp://ast2-deim.urv.cat/s2caio_vm](ftp://ast2-deim.urv.cat/s2caio_vm) 
 
 ## Support
 

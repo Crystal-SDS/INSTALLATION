@@ -1,5 +1,7 @@
 #!/bin/bash
 
+OPENSTACK_RELEASE=pike
+
 #########  PASSWORDS  #########
 MYSQL_PASSWD=root
 RABBITMQ_PASSWD=openstack
@@ -19,7 +21,7 @@ upgrade_system(){
 
 	add-apt-repository universe
 	apt install software-properties-common -y
-	add-apt-repository cloud-archive:pike -y
+	add-apt-repository cloud-archive:$OPENSTACK_RELEASE -y
 	apt update
 
 	DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
@@ -179,11 +181,12 @@ install_openstack_swift(){
 	apt install xfsprogs rsync -y
 	
 	mkdir /etc/swift
-	curl -o /etc/swift/proxy-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/proxy-server.conf-sample?h=stable/pike
-	curl -o /etc/swift/account-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/account-server.conf-sample?h=stable/pike
-	curl -o /etc/swift/container-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/container-server.conf-sample?h=stable/pike
-	curl -o /etc/swift/object-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/object-server.conf-sample?h=stable/pike
-	curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/swift.conf-sample?h=stable/pike
+	chown $(whoami):$(whoami) /etc/swift
+	curl -o /etc/swift/proxy-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/proxy-server.conf-sample?h=stable/$OPENSTACK_RELEASE
+	curl -o /etc/swift/account-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/account-server.conf-sample?h=stable/$OPENSTACK_RELEASE
+	curl -o /etc/swift/container-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/container-server.conf-sample?h=stable/$OPENSTACK_RELEASE
+	curl -o /etc/swift/object-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/object-server.conf-sample?h=stable/$OPENSTACK_RELEASE
+	curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/swift.conf-sample?h=stable/$OPENSTACK_RELEASE
 	
 	mkdir -p /srv/node/sda1
 	mkdir -p /var/cache/swift
@@ -248,7 +251,6 @@ install_openstack_swift(){
 #### Crystal Controller #####
 install_crystal_controller() {
 	apt install python-pip python-dev sshpass -y
-	#pip install -U pip
 	
 	apt install redis-server -y
 	sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
@@ -256,11 +258,9 @@ install_crystal_controller() {
 	
 	git clone https://github.com/Crystal-SDS/controller /usr/share/crystal-controller
 	pip install -r /usr/share/crystal-controller/requirements.txt
-	#pip install -U pyactor redis pika pytz eventlet djangorestframework django-bootstrap3 ssh_paramiko
 	cp /usr/share/crystal-controller/etc/apache2/sites-available/crystal_controller.conf /etc/apache2/sites-available/
 	a2ensite crystal_controller
 	
-	chown crystal:crystal /etc/swift
 	mkdir /opt/crystal
 	mkdir -p /opt/crystal/controllers
 	mkdir -p /opt/crystal/swift/tmp
@@ -274,6 +274,8 @@ install_crystal_dashboard() {
 	cp dashboard/crystal_dashboard/enabled/_50_sdscontroller.py /usr/share/openstack-dashboard/openstack_dashboard/enabled/
 	cat dashboard/crystal_dashboard/local/local_settings.py >> /etc/openstack-dashboard/local_settings.py
 	pip install dashboard/
+	
+	rm -r dashboard
 }
 
 #### ACL middleware #####
@@ -286,7 +288,8 @@ install_crystal_acl_middleware(){
 	[filter:crystal_acl]
 	use = egg:swift_crystal_acl_middleware#crystal_acl
 	EOF
-
+	
+	rm -r acl-middleware
 }
 
 #### Filter middleware #####
@@ -322,6 +325,7 @@ install_crystal_filter_middleware(){
 
 	mkdir /opt/crystal/native_filters
 	mkdir /opt/crystal/storlet_filters
+	rm -r filter-middleware
 }
 
 
@@ -360,6 +364,7 @@ install_crystal_metric_middleware(){
 	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metrics crystal_filters object-server' /etc/swift/object-server.conf
 	
 	mkdir /opt/crystal/workload_metrics
+	rm -r metric-middleware
 }
 
 
@@ -430,10 +435,12 @@ install_storlets(){
 	service docker start
 	
 	# Install Storlets
-	git clone https://github.com/openstack/storlets -b stable/pike
+	git clone https://github.com/openstack/storlets -b stable/$OPENSTACK_RELEASE
 	pip install storlets/
 	cd storlets
 	./install_libs.sh
+	
+	# Install host-side scripts
 	mkdir /home/docker_device/scripts
 	chown swift:swift /home/docker_device/scripts
 	cp scripts/restart_docker_container /home/docker_device/scripts/
@@ -472,6 +479,7 @@ install_storlets(){
 	cp /etc/swift/proxy-server.conf /etc/swift/storlet-proxy-server.conf
 	sed -i '/^pipeline =/ d' /etc/swift/storlet-proxy-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = proxy-logging cache slo proxy-logging proxy-server' /etc/swift/storlet-proxy-server.conf
+	rm -r storlets
 }
 
 
@@ -515,6 +523,7 @@ initialize_crystal(){
 	cp filter-samples/Storlet_compression/bin/compress-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_crypto/bin/crypto-1.0.jar /opt/crystal/storlet_filters/
 	cp filter-samples/Storlet_noop/bin/noop-1.0.jar /opt/crystal/storlet_filters/
+	rm -r filter-samples
 	
 	chown -R www-data:www-data /opt/crystal
 	
@@ -524,6 +533,7 @@ initialize_crystal(){
 	chmod 655 /var/lib/redis/dump.rdb
 	chown redis:redis /var/lib/redis/dump.rdb
 	service redis-server start
+	
 }
 
 
@@ -560,7 +570,7 @@ install_crystal(){
 	printf "Installing Crystal Dashboard\t ... \t50%%"
 	install_crystal_dashboard >> $LOG 2>&1; printf "\tDone!\n"
 	
-	printf "Installing Crystal Dashboard\t ... \t55%%"
+	printf "Installing ACL Middleware\t ... \t55%%"
 	install_crystal_acl_middleware >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing Filter Middleware\t ... \t60%%"
 	install_crystal_filter_middleware >> $LOG 2>&1; printf "\tDone!\n"
@@ -576,15 +586,36 @@ install_crystal(){
 	
 	restart_services >> $LOG 2>&1;
 	printf "Crystal AiO installation\t ... \t100%%\tCompleted!\n\n"
-	printf "Access to the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"
-	printf "Login with, user: manager | password: $CRYSTAL_MANAGER_PASSWD\n\n"
+	printf "Access the Dashboard with the following URL: http://$IP_ADRESS/horizon\n"
+	printf "Login with user: manager | password: $CRYSTAL_MANAGER_PASSWD\n\n"
 }
 
 
 update_crystal(){
 	printf "\nUpdating Crystal Installation. The script takes long to complete, be patient!\n"
 	printf "See the full log at $LOG\n\n"
-	#TODO
+	
+	printf "Updating Crystal Controller\t ... \t10%%"
+	install_crystal_controller >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Updating Crystal Dashboard\t ... \t30%%"
+	install_crystal_dashboard >> $LOG 2>&1; printf "\tDone!\n"
+	
+	printf "Updating ACL Middleware\t ... \t50%%"
+	git clone https://github.com/Crystal-SDS/acl-middleware  >> $LOG 2>&1;
+	pip install acl-middleware/  >> $LOG 2>&1;
+	rm -r acl-middleware  >> $LOG 2>&1;
+	
+	printf "Updating Filter Middleware\t ... \t75%%"
+	git clone https://github.com/Crystal-SDS/filter-middleware  >> $LOG 2>&1;
+	pip install filter-middleware/  >> $LOG 2>&1;
+	rm -r filter-middleware  >> $LOG 2>&1;
+	
+	printf "Updating Metric Middleware\t ... \t90%%"
+	git clone https://github.com/Crystal-SDS/metric-middleware  >> $LOG 2>&1;
+	pip install metric-middleware/  >> $LOG 2>&1;
+	rm -r metric-middleware  >> $LOG 2>&1;
+	
+	printf "Updating Crystal AiO\t ... \t100%%\tCompleted!\n\n"
 }
 
 
