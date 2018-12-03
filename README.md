@@ -44,7 +44,7 @@ By default, the script has low verbosity. To see the full installation log, run 
 tail -f /tmp/crystal_aio_installation.log
 ```
 
-The script takes long to complete (it depends of the network connection). Once completed, you can access to the Dashboard by typing the following URL in the web browser: `http://<node-ip>/horizon`
+The script takes long to complete (it depends of the network connection). Once completed, you can access to the dashboard by typing the following URL in the web browser: `http://<node-ip>/horizon`. Once logged into the dashboard, go to the left menu, `Swift Cluster --> Nodes`, and edit the controller node. Write the credentials of your default VM user to enable ssh access to Crystal.
 
 ### Development VM
 
