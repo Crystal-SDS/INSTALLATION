@@ -182,11 +182,11 @@ install_openstack_swift(){
 	
 	mkdir /etc/swift
 	chown $(whoami):$(whoami) /etc/swift
-	curl -o /etc/swift/proxy-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/proxy-server.conf-sample?h=stable/$OPENSTACK_RELEASE
-	curl -o /etc/swift/account-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/account-server.conf-sample?h=stable/$OPENSTACK_RELEASE
-	curl -o /etc/swift/container-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/container-server.conf-sample?h=stable/$OPENSTACK_RELEASE
-	curl -o /etc/swift/object-server.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/object-server.conf-sample?h=stable/$OPENSTACK_RELEASE
-	curl -o /etc/swift/swift.conf https://git.openstack.org/cgit/openstack/swift/plain/etc/swift.conf-sample?h=stable/$OPENSTACK_RELEASE
+	curl -o /etc/swift/proxy-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/proxy-server.conf-sample
+	curl -o /etc/swift/account-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/account-server.conf-sample
+	curl -o /etc/swift/container-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/container-server.conf-sample
+	curl -o /etc/swift/object-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/object-server.conf-sample
+	curl -o /etc/swift/swift.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/swift.conf-sample
 	
 	mkdir -p /srv/node/sda1
 	mkdir -p /var/cache/swift
