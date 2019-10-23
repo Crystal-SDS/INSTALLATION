@@ -181,7 +181,6 @@ install_openstack_swift(){
 	apt install xfsprogs rsync -y
 	
 	mkdir /etc/swift
-	chown $(whoami):$(whoami) /etc/swift
 	curl -o /etc/swift/proxy-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/proxy-server.conf-sample
 	curl -o /etc/swift/account-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/account-server.conf-sample
 	curl -o /etc/swift/container-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/container-server.conf-sample
@@ -244,6 +243,8 @@ install_openstack_swift(){
 	swift-init all stop
 	#usermod -u 1010 swift
 	#groupmod -g 1010 swift
+	current_user=`who am i | awk '{print $1}'`
+	chown -R $current_user:$current_user /etc/swift
 	
 }
 
@@ -449,7 +450,8 @@ install_storlets(){
 	chmod 04755 /home/docker_device/scripts/*
 	
 	# Create Storlet docker runtime
-	usermod -aG docker $(whoami)
+	current_user=`who am i | awk '{print $1}'`
+	usermod -aG docker $current_user
 	sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml/c\ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml --connection=local" install/storlets/prepare_storlets_install.sh
 	install/storlets/prepare_storlets_install.sh dev host
 	
