@@ -44,7 +44,12 @@ By default, the script has low verbosity. To see the full installation log, run 
 tail -f /tmp/crystal_aio_installation.log
 ```
 
-The script takes long to complete (it depends of the network connection). Once completed, you can access to the dashboard by typing the following URL in the web browser: `http://<node-ip>/horizon`. Once logged into the dashboard, go to the left menu, `Swift Cluster --> Nodes`, and edit the controller node. Write the credentials of your default VM user to enable ssh access to Crystal.
+The script takes long to complete (it depends of the network connection). Once completed, you can access to the dashboard by typing the following URL in the web browser: `http://<node-ip>/horizon`. Once logged into the dashboard, follow these steps to finish the installation:
+1. Go to the left menu, `Swift Cluster --> Nodes`, and "Edit" the controller proxy node. Write the credentials of your machine user to enable ssh access to Crystal.
+2. Go to the left menu, `Swift Cluster --> Storage policies`, and click "Load Swift Policies" button. This will load your current storage policies from `/etc/swift/swift.conf`
+3. Go to the left menu, `SDS Management --> Projects`, and "Enable Crystal" to the crystal test project (or any other project you want to use Crystal).
+4. Download the `crystal_dashboard.json` file from this repository. Then, go to the left menu, `Monitoring --> kibana`. Within the kibana dashboard, go to `Management --> Saved Objects`, click on "Import" and select the `crystal_dashboard.json` file. Once imported, go to the left menu `Dashboard` and open the `Crystal-system-overview`. Then, in the top meu, click `share --> Share snapshoot --> link --> Short url`. From the provided link, for example: `http://10.30.222.82:5601/goto/48636961790043097b0c46937bb6a07a` copy the last hashtag and paste it into `/etc/openstack-dashboard/local_settings.py` in the variable named `CRYSTAL_MONITORING_DASHBOARD` located at the end of the document, for example: `CRYSTAL_MONITORING_DASHBOARD="48636961790043097b0c46937bb6a07a"`.
+
 
 ### Development VM
 

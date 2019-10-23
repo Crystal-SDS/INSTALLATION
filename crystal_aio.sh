@@ -15,24 +15,24 @@ LOG=/tmp/crystal_aio_installation.log
 upgrade_system(){
 	echo controller > /etc/hostname
 	echo -e "127.0.0.1 \t localhost" > /etc/hosts
-	IP_ADRESS=$(hostname -I | tr -d '[:space:]')
+	IP_ADRESS=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
 	echo -e "$IP_ADRESS \t controller" >> /etc/hosts
 	#ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
 	add-apt-repository universe
-	apt install software-properties-common -y
+	apt-get install software-properties-common -y
 	add-apt-repository cloud-archive:$OPENSTACK_RELEASE -y
-	apt update
+	apt-get update
 
-	DEBIAN_FRONTEND=noninteractive apt -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
+	DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
 	unset DEBIAN_FRONTEND
-	apt install python-openstackclient -y
+	apt-get install python-openstackclient python-pip python-dev sshpass -y
 }
 
 
 ###### Install Memcached ######
 install_memcache_server(){
-	apt install memcached python-memcache -y
+	apt-get install memcached python-memcache -y
 	sed -i '/-l 127.0.0.1/c\-l controller' /etc/memcached.conf
 	service memcached restart
 }
@@ -40,7 +40,7 @@ install_memcache_server(){
 
 ###### Install RabbitMQ ######
 install_rabbitmq_server(){
-	apt install rabbitmq-server -y
+	apt-get install rabbitmq-server -y
 	rabbitmqctl add_user openstack $RABBITMQ_PASSWD
 	rabbitmqctl set_user_tags openstack administrator
 	rabbitmqctl set_permissions openstack ".*" ".*" ".*"
@@ -54,7 +54,7 @@ install_mysql_server(){
 	export DEBIAN_FRONTEND=noninteractive
 	debconf-set-selections <<< "mariadb-server-10.0 mysql-server/root_password password $MYSQL_PASSWD"
 	debconf-set-selections <<< "mariadb-server-10.0 mysql-server/root_password_again password $MYSQL_PASSWD"
-	apt install mariadb-server python-pymysql -y
+	apt-get install mariadb-server python-pymysql -y
 	unset DEBIAN_FRONTEND
 	
 	mysql -uroot -p$MYSQL_PASSWD -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
@@ -82,7 +82,7 @@ install_openstack_keystone(){
 	mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone'"
 	mysql -uroot -p$MYSQL_PASSWD -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone'"
 	
-	apt install keystone apache2 libapache2-mod-wsgi -y
+	apt-get install keystone apache2 libapache2-mod-wsgi python-keystoneclient python-keystonemiddleware -y
 	
 	sed -i '/connection =/c\connection = mysql+pymysql://keystone:keystone@controller/keystone' /etc/keystone/keystone.conf
 	sed -i '/#provider = fernet/c\provider = fernet' /etc/keystone/keystone.conf
@@ -149,7 +149,7 @@ install_openstack_keystone(){
 
 ###### OpenStak Horizon ######
 install_openstack_horizon() {
-	apt install openstack-dashboard -y
+	apt-get install openstack-dashboard -y
 	cat <<-EOF >> /etc/openstack-dashboard/local_settings.py
 	
 	OPENSTACK_API_VERSIONS = {
@@ -176,9 +176,9 @@ install_openstack_swift(){
 	openstack endpoint create --region RegionOne object-store internal http://controller:8080/v1/AUTH_%\(tenant_id\)s
 	openstack endpoint create --region RegionOne object-store admin http://controller:8080/v1
 	
-	apt install swift swift-proxy swift-account swift-container swift-object -y
-	apt install python-swiftclient python-keystoneclient python-keystonemiddleware memcached -y
-	apt install xfsprogs rsync -y
+	apt-get install swift swift-proxy swift-account swift-container swift-object python-swiftclient -y
+	#apt-get install python-keystoneclient python-keystonemiddleware memcached -y
+	apt-get install xfsprogs rsync -y
 	
 	mkdir /etc/swift
 	curl -o /etc/swift/proxy-server.conf https://opendev.org/openstack/swift/raw/branch/stable/$OPENSTACK_RELEASE/etc/proxy-server.conf-sample
@@ -248,12 +248,127 @@ install_openstack_swift(){
 	
 }
 
+##### Install Storlets #####
+install_storlets(){
+	# Install Java
+	add-apt-repository -y ppa:webupd8team/java
+	apt-get update
+	apt-get install openjdk-8-jdk openjdk-8-jre -y
+
+	# Install Docker
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+	sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
+	apt-get update
+	apt-get install aufs-tools linux-image-generic apt-transport-https docker-ce ansible ant -y
+	
+	cat <<-EOF >> /etc/docker/daemon.json
+	{
+	"data-root": "/home/docker_device/docker"
+	}
+	EOF
+	
+	mkdir /home/docker_device
+	chmod 777 /home/docker_device
+	service docker stop
+	service docker start
+	
+	# Install Storlets
+	git clone https://github.com/openstack/storlets -b stable/$OPENSTACK_RELEASE
+	pip install storlets/
+	cd storlets
+	./install_libs.sh
+	
+	# Install host-side scripts
+	mkdir /home/docker_device/scripts
+	chown swift:swift /home/docker_device/scripts
+	cp scripts/restart_docker_container /home/docker_device/scripts/
+	cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/
+	chown root:root /home/docker_device/scripts/*
+	chmod 04755 /home/docker_device/scripts/*
+	
+	# Create Storlet docker runtime
+	current_user=`who am i | awk '{print $1}'`
+	usermod -aG docker $current_user
+	sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml/c\ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml --connection=local" install/storlets/prepare_storlets_install.sh
+	install/storlets/prepare_storlets_install.sh dev host
+
+	cd install/storlets/
+	SWIFT_UID=$(id -u swift)
+	SWIFT_GID=$(id -g swift)
+	sed -i '/- role: docker_client/c\  #- role: docker_client' docker_cluster.yml
+	sed -i '/- role: docker_base_jre_image/c\  #- role: docker_base_jre_image' docker_cluster.yml
+	sed -i '/"swift_user_id": "1003"/c\\t"swift_user_id": "'$SWIFT_UID'",' deploy/cluster_config.json
+	sed -i '/"swift_group_id": "1003"/c\\t"swift_group_id": "'$SWIFT_GID'",' deploy/cluster_config.json
+	sed -i '/ - http:\/\/www.slf4j.org\/dist\/slf4j-1.7.7.tar.gz/c\    - https://src.fedoraproject.org/lookaside/extras/slf4j/slf4j-1.7.7.tar.gz/e3f7ab85c0efa2248228baccb4f64442/slf4j-1.7.7.tar.gz' roles/docker_base_jre_image/tasks/ubuntu_16.04_jre8.yml
+	sed -i '/ - http:\/\/logback.qos.ch\/dist\/logback-1.1.2.tar.gz/c\    - https://src.fedoraproject.org/lookaside/extras/logback/logback-1.1.2.tar.gz/f23e3b9151d4d9d61aeb49b0288a1a8e/logback-1.1.2.tar.gz' roles/docker_base_jre_image/tasks/ubuntu_16.04_jre8.yml
+	
+	docker pull jsampe/ubuntu_16.04_jre8
+	docker tag jsampe/ubuntu_16.04_jre8 ubuntu_16.04_jre8
+	ansible-playbook -s -i storlets_dynamic_inventory.py docker_cluster.yml --connection=local
+	docker rmi jsampe/ubuntu_16.04_jre8 ubuntu_16.04_jre8 ubuntu:16.04 -f
+	cd ~
+	
+	cat <<-EOF >> /etc/swift/storlet_docker_gateway.conf
+	[DEFAULT]
+	lxc_root = /home/docker_device/scopes
+	cache_dir = /home/docker_device/cache/scopes
+	log_dir = /home/docker_device/logs/scopes
+	script_dir = /home/docker_device/scripts
+	storlets_dir = /home/docker_device/storlets/scopes
+	pipes_dir = /home/docker_device/pipes/scopes
+	docker_repo = 
+	restart_linux_container_timeout = 8
+	storlet_timeout = 40
+	EOF
+	
+	cp /etc/swift/proxy-server.conf /etc/swift/storlet-proxy-server.conf
+	sed -i '/^pipeline =/ d' /etc/swift/storlet-proxy-server.conf
+	sed -i '/\[pipeline:main\]/a pipeline = proxy-logging cache slo proxy-logging proxy-server' /etc/swift/storlet-proxy-server.conf
+	rm -r storlets
+}
+
+####   ELK Stack  ####
+install_elk(){	
+	wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+	echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list
+	apt-get update
+	apt-get install elasticsearch logstash kibana metricbeat -y
+	
+	sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
+	sed -i '/#logging.dest: stdout/c\logging.dest: /var/log/kibana/kibana.log' /etc/kibana/kibana.yml
+	
+	cat <<-EOF >> /etc/logstash/conf.d/logstash.conf
+	input {
+	  udp{
+	    port => 5400
+	    codec => json
+	  }
+	}
+	output {
+	   elasticsearch {
+	       hosts => ["localhost:9200"]
+	   }
+	}
+	EOF
+	
+	mkdir /var/log/kibana
+	chown kibana:kibana /var/log/kibana
+	
+	systemctl enable elasticsearch 
+	systemctl enable logstash
+	systemctl enable kibana
+	systemctl enable metricbeat
+	
+	service elasticsearch restart
+	service logstash restart
+	service kibana restart
+	service metricbeat restart
+	
+}
 
 #### Crystal Controller #####
-install_crystal_controller() {
-	apt install python-pip python-dev sshpass -y
-	
-	apt install redis-server -y
+install_crystal_controller() {	
+	apt-get install redis-server -y
 	sed -i '/bind 127.0.0.1/c\bind 0.0.0.0' /etc/redis/redis.conf
 	service redis restart
 	
@@ -267,7 +382,6 @@ install_crystal_controller() {
 	mkdir -p /opt/crystal/swift/tmp
 	mkdir -p /opt/crystal/swift/deploy
 }
-
 
 #### Crystal Dashboard #####
 install_crystal_dashboard() {
@@ -357,150 +471,35 @@ install_crystal_metric_middleware(){
 	rabbit_password = $RABBITMQ_PASSWD
 	EOF
 	
-		
+	mkdir /opt/crystal/workload_metrics
+	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
+	rm -r metric-middleware
+}
+
+##### Initialize Crystal #####
+initialize_crystal(){
+	# Activate Middlewares
 	sed -i '/^pipeline =/ d' /etc/swift/proxy-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = catch_errors gatekeeper healthcheck proxy-logging cache container_sync bulk tempurl ratelimit authtoken crystal_acl keystoneauth copy container-quotas account-quotas crystal_metrics crystal_filters copy slo dlo versioned_writes proxy-logging proxy-server' /etc/swift/proxy-server.conf
 	
 	sed -i '/^pipeline =/ d' /etc/swift/object-server.conf
 	sed -i '/\[pipeline:main\]/a pipeline = healthcheck recon crystal_metrics crystal_filters object-server' /etc/swift/object-server.conf
-	
-	mkdir /opt/crystal/workload_metrics
-	rm -r metric-middleware
-}
-
-
-####   ELK Stack  ####
-install_elk(){
-	add-apt-repository -y ppa:webupd8team/java
-	apt update
-	apt install openjdk-8-jdk openjdk-8-jre -y
-	#echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections
-	#echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections
-	#apt install oracle-java8-installer -y
-	
-	wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
-	echo "deb https://artifacts.elastic.co/packages/5.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-5.x.list
-	apt update
-	apt install elasticsearch logstash kibana metricbeat -y
-	
-	sed -i '/#server.host: "localhost"/c\server.host: "0.0.0.0"' /etc/kibana/kibana.yml
-	sed -i '/#logging.dest: stdout/c\logging.dest: /var/log/kibana/kibana.log' /etc/kibana/kibana.yml
-	
-	cat <<-EOF >> /etc/logstash/conf.d/logstash.conf
-	input {
-	  udp{
-	    port => 5400
-	    codec => json
-	  }
-	}
-	output {
-	   elasticsearch {
-	       hosts => ["localhost:9200"]
-	   }
-	}
-	EOF
-	
-	mkdir /var/log/kibana
-	chown kibana:kibana /var/log/kibana
-	
-	systemctl enable elasticsearch 
-	systemctl enable logstash
-	systemctl enable kibana
-	systemctl enable metricbeat
-	
-	service elasticsearch restart
-	service logstash restart
-	service kibana restart
-	service metricbeat restart
-	
-}
-
-
-##### Install Storlets #####
-install_storlets(){
-	# Install Docker
-	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-	sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
-	apt update
-	apt install aufs-tools linux-image-generic apt-transport-https docker-ce ansible ant -y
-	
-	cat <<-EOF >> /etc/docker/daemon.json
-	{
-	"data-root": "/home/docker_device/docker"
-	}
-	EOF
-	
-	mkdir /home/docker_device
-	chmod 777 /home/docker_device
-	service docker stop
-	service docker start
-	
-	# Install Storlets
-	git clone https://github.com/openstack/storlets -b stable/$OPENSTACK_RELEASE
-	pip install storlets/
-	cd storlets
-	./install_libs.sh
-	
-	# Install host-side scripts
-	mkdir /home/docker_device/scripts
-	chown swift:swift /home/docker_device/scripts
-	cp scripts/restart_docker_container /home/docker_device/scripts/
-	cp scripts/send_halt_cmd_to_daemon_factory.py /home/docker_device/scripts/
-	chown root:root /home/docker_device/scripts/*
-	chmod 04755 /home/docker_device/scripts/*
-	
-	# Create Storlet docker runtime
-	current_user=`who am i | awk '{print $1}'`
-	usermod -aG docker $current_user
-	sed -i "/ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml/c\ansible-playbook \-s \-i deploy\/prepare_host prepare_storlets_install.yml --connection=local" install/storlets/prepare_storlets_install.sh
-	install/storlets/prepare_storlets_install.sh dev host
-	
-	cd install/storlets/
-	SWIFT_UID=$(id -u swift)
-	SWIFT_GID=$(id -g swift)
-	sed -i '/- role: docker_client/c\  #- role: docker_client' docker_cluster.yml
-	sed -i '/"swift_user_id": "1003"/c\\t"swift_user_id": "'$SWIFT_UID'",' deploy/cluster_config.json
-	sed -i '/"swift_group_id": "1003"/c\\t"swift_group_id": "'$SWIFT_GID'",' deploy/cluster_config.json
-	ansible-playbook -s -i storlets_dynamic_inventory.py docker_cluster.yml --connection=local
-	docker rmi ubuntu_16.04_jre8 ubuntu:16.04 ubuntu_16.04 -f
-	cd ~
-	
-	cat <<-EOF >> /etc/swift/storlet_docker_gateway.conf
-	[DEFAULT]
-	lxc_root = /home/docker_device/scopes
-	cache_dir = /home/docker_device/cache/scopes
-	log_dir = /home/docker_device/logs/scopes
-	script_dir = /home/docker_device/scripts
-	storlets_dir = /home/docker_device/storlets/scopes
-	pipes_dir = /home/docker_device/pipes/scopes
-	docker_repo = 
-	restart_linux_container_timeout = 8
-	storlet_timeout = 40
-	EOF
-	
-	cp /etc/swift/proxy-server.conf /etc/swift/storlet-proxy-server.conf
-	sed -i '/^pipeline =/ d' /etc/swift/storlet-proxy-server.conf
-	sed -i '/\[pipeline:main\]/a pipeline = proxy-logging cache slo proxy-logging proxy-server' /etc/swift/storlet-proxy-server.conf
-	rm -r storlets
-}
-
-
-##### Initialize Crystal #####
-initialize_crystal(){
-	# Initialize Crystal test tenant
-	. crystal-openrc
-	PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
-	docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
 	swift-init main restart
 
+	. crystal-openrc
 	swift post .storlet
-	# swift post -r '*:manager' storlet
-	#swift post -w '*:manager' storlet
+	swift post .dependency
+	#swift post -r '*:manager' .storlet
+	#swift post -w '*:manager' .storlet
 	#swift post dependency
-	#swift post -r '*:manager' dependency
-	#swift post -w '*:manager' dependency
+	#swift post -r '*:manager' .dependency
+	#swift post -w '*:manager' .dependency
 	swift post -H "X-account-meta-storlet-enabled:True"
 	swift post -H "X-account-meta-crystal-enabled:True"
+
+	# Create storlets runtime
+	PROJECT_ID=$(openstack token issue | grep -w project_id | awk '{print $4}')
+	docker tag ubuntu_16.04_jre8_storlets ${PROJECT_ID:0:13}
 	
 	# Load default dashboards to kibana
 	/usr/share/metricbeat/scripts/import_dashboards
@@ -511,9 +510,7 @@ initialize_crystal(){
 	
 	# Load default data
 	cp /usr/share/crystal-controller/controller_samples/static_bandwidth.py /opt/crystal/controllers/
-	
-	cp metric-middleware/metric_samples/* /opt/crystal/workload_metrics
-	
+		
 	git clone https://github.com/Crystal-SDS/filter-samples
 	cp filter-samples/Native_bandwidth_differentiation/bandwidth_control_filter.py /opt/crystal/native_filters/
 	cp filter-samples/Native_cache/caching_filter.py /opt/crystal/native_filters/
@@ -566,23 +563,22 @@ install_crystal(){
 	install_openstack_horizon >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Installing OpenStack Swift\t ... \t30%%"
 	install_openstack_swift >> $LOG 2>&1; printf "\tDone!\n"
-	
-	printf "Installing Crystal Controller\t ... \t40%%"
-	install_crystal_controller >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing Crystal Dashboard\t ... \t50%%"
-	install_crystal_dashboard >> $LOG 2>&1; printf "\tDone!\n"
-	
-	printf "Installing ACL Middleware\t ... \t55%%"
-	install_crystal_acl_middleware >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing Filter Middleware\t ... \t60%%"
-	install_crystal_filter_middleware >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing Metric middleware\t ... \t70%%"
-	install_crystal_metric_middleware >> $LOG 2>&1; printf "\tDone!\n"
 
-	printf "Installing ELK stack\t\t ... \t80%%"
-	install_elk >> $LOG 2>&1; printf "\tDone!\n"
-	printf "Installing Storlets\t\t ... \t90%%"
+	printf "Installing Storlets\t\t ... \t45%%"
 	install_storlets >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Installing ELK stack\t\t ... \t60%%"
+	install_elk >> $LOG 2>&1; printf "\tDone!\n"
+
+	printf "Installing Crystal Controller\t ... \t70%%"
+	install_crystal_controller >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Installing Crystal Dashboard\t ... \t75%%"
+	install_crystal_dashboard >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Installing ACL Middleware\t ... \t80%%"
+	install_crystal_acl_middleware >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Installing Filter Middleware\t ... \t85%%"
+	install_crystal_filter_middleware >> $LOG 2>&1; printf "\tDone!\n"
+	printf "Installing Metric middleware\t ... \t90%%"
+	install_crystal_metric_middleware >> $LOG 2>&1; printf "\tDone!\n"
 	printf "Initializing Crystal\t\t ... \t95%%"
 	initialize_crystal >> $LOG 2>&1; printf "\tDone!\n"
 	
