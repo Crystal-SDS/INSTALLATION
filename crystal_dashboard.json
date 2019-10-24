@@ -50,7 +50,7 @@
     }
   },
   {
-    "_id": "95831540-9716-11e7-addf-65e0289d81e2",
+    "_id": "Crystal-system-overview",
     "_type": "dashboard",
     "_source": {
       "title": "Crystal-system-overview",
@@ -79,7 +79,7 @@
     "_type": "visualization",
     "_source": {
       "title": "System Navigator",
-      "visState": "{\"title\":\"System Navigator\",\"type\":\"markdown\",\"params\":{\"markdown\":\"- [Overview](#/dashboard/95831540-9716-11e7-addf-65e0289d81e2)\\n\\n- [Project Monitoring](#/dashboard/Swift-Project-Metrics)\\n\\n- [Container Monitoring](#/dashboard/Swift-Container-Metrics)\\n\\n- [System Monitoring](#/dashboard/95831540-9716-11e7-addf-65e0289d81e2)\"},\"aggs\":[],\"listeners\":{}}",
+      "visState": "{\"title\":\"System Navigator\",\"type\":\"markdown\",\"params\":{\"markdown\":\"- [Overview](#/dashboard/Crystal-system-overview)\\n\\n- [Project Monitoring](#/dashboard/Swift-Project-Metrics)\\n\\n- [Container Monitoring](#/dashboard/Swift-Container-Metrics)\\n\\n- [System Monitoring](#/dashboard/Metricbeat-system-overview)\"},\"aggs\":[],\"listeners\":{}}",
       "uiStateJSON": "{}",
       "description": "",
       "version": 1,
