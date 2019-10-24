@@ -64,12 +64,8 @@ Download the Development VM from the following URL:
 
 Once downloaded, follow thsee steps:
 1. Create a VM with at least 6Gb of RAM from the .ova file.
-2. Start the VM and use the following credentials to login:
-   - user: crystal | password: crystal
-3. Run the next script to update the IP adddress.
-   ```
-   sudo ./set_current_ip.sh
-   ```
+2. Start the VM and use the following credentials to login: - user: **crystal** | - password: **crystal**
+3. Run the next script to update the IP adddress: `sudo ./set_current_ip.sh`
 4. Once the script completes the process, you will see in the screen the instructions for accessing to the dashboard.
 
 
