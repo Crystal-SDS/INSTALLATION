@@ -26,7 +26,7 @@ upgrade_system(){
 
 	DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
 	unset DEBIAN_FRONTEND
-	apt-get install python-openstackclient python-pip python-dev sshpass -y
+	apt-get install python-openstackclient python-pip python-dev sshpass libssl-dev -y
 }
 
 
