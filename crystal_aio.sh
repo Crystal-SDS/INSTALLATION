@@ -625,7 +625,7 @@ usage(){
 
 COMMAND="$1"
 main(){
-	if [[ `lsb_release -rs` == "16.04" ] && [ `uname -m` == "x86_64" ]]
+	if [[ `lsb_release -rs` == "16.04" ]] && [[ `uname -m` == "x86_645" ]]
 	then
 		case $COMMAND in
 		  "install" )
@@ -638,6 +638,8 @@ main(){
 		  * )
 		    install_crystal
 		esac
+	else
+		printf "\nERROR: Crystal can't be installed in this operating system version.\n\n"
 	fi
 }
 
