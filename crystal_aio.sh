@@ -625,7 +625,7 @@ usage(){
 
 COMMAND="$1"
 main(){
-	if [[ `lsb_release -rs` == "16.04" ]]
+	if [[ `lsb_release -rs` == "16.04" ] && [ `uname -m` == "x86_64" ]]
 	then
 		case $COMMAND in
 		  "install" )
