@@ -10,6 +10,7 @@ CRYSTAL_MANAGER_PASSWD=manager
 ###############################
 
 LOG=/tmp/crystal_aio_installation.log
+export LC_ALL=C
 
 ###### Upgrade System ######
 upgrade_system(){
